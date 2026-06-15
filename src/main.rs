@@ -1,4 +1,4 @@
-use tower_lsp::lsp_types::*;
+use tower_lsp_server::ls_types::*;
 use tree_sitter::Node;
 
 fn collect_syntax_errors(node: Node, diagnostics: &mut Vec<Diagnostic>) {
@@ -29,16 +29,15 @@ fn collect_syntax_errors(node: Node, diagnostics: &mut Vec<Diagnostic>) {
     }
 }
 
-use tower_lsp::{Client, LanguageServer};
+use tower_lsp_server::{Client, LanguageServer};
 
 struct Backend {
     client: Client,
     parser: Mutex<tree_sitter::Parser>,
 }
 
-use tower_lsp::jsonrpc::Result;
+use tower_lsp_server::jsonrpc::Result;
 
-#[tower_lsp::async_trait]
 impl LanguageServer for Backend {
     async fn initialize(&self, _: InitializeParams) -> Result<InitializeResult> {
         Ok(InitializeResult {
@@ -70,7 +69,7 @@ impl LanguageServer for Backend {
 }
 
 impl Backend {
-    async fn on_change(&self, uri: Url, text: String) {
+    async fn on_change(&self, uri: Uri, text: String) {
         let mut parser = self.parser.lock().await;
         let tree = parser.parse(&text, None).unwrap();
 
@@ -84,7 +83,7 @@ impl Backend {
 }
 
 use tokio::sync::Mutex;
-use tower_lsp::{LspService, Server};
+use tower_lsp_server::{LspService, Server};
 
 #[tokio::main]
 async fn main() {
