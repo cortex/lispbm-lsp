@@ -1,0 +1,10 @@
+[package]
+name = "lispbm-lsp"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+tower-lsp = "0.20" 
+tree-sitter = "0.26.3" 
+tree-sitter-lispbm = { path = "../tree-sitter-lispbm" } # Or version from crates.io
