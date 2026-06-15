@@ -1,6 +1,9 @@
 use tower_lsp_server::ls_types::*;
 use tree_sitter::Node;
 
+mod definitions;
+mod entry;
+
 fn collect_syntax_errors(node: Node, diagnostics: &mut Vec<Diagnostic>) {
     if node.is_error() || node.is_missing() {
         let range = Range {
