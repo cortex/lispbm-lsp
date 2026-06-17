@@ -7,12 +7,12 @@ use tree_sitter::Node;
 pub struct Definition {
     pub file: path::PathBuf,
     pub comment: Option<String>,
-    pub line: usize,
-    pub column: usize,
+    pub line: u32,
+    pub column: u32,
 }
 
 impl Definition {
-    pub fn new(file: path::PathBuf, comment: Option<String>, line: usize, column: usize) -> Self {
+    pub fn new(file: path::PathBuf, comment: Option<String>, line: u32, column: u32) -> Self {
         Self {
             file,
             comment,
@@ -29,8 +29,8 @@ impl Definition {
         let mut name = None;
         let mut comment = None;
 
-        let mut line = 0;
-        let mut column = 0;
+        let mut line: u32 = 0;
+        let mut column: u32 = 0;
 
         for capture in captures.iter() {
             match capture.index {
@@ -59,8 +59,8 @@ impl Definition {
                             .to_string(),
                     );
                     let start = capture.node.start_position();
-                    line = start.row + 1;
-                    column = start.column + 1;
+                    line = start.row as u32;
+                    column = start.column as u32;
                 }
                 _ => return Err(format!("Unexpected capture index: {}", capture.index)),
             }
