@@ -132,7 +132,7 @@ impl Backend {
                 return;
             }
         };
-        if let Some(import_paths) = entry.get_all_imports(&self.client, &mut parser).await {
+        if let Some(import_paths) = entry.get_all_imports(&mut parser).await {
             self.client
                 .log_message(
                     MessageType::INFO,
@@ -213,17 +213,29 @@ impl Backend {
 
         let tree = parser.parse(text, None).unwrap();
 
-        let q = tree_sitter::Query::new(&tree_sitter_lispbm::LANGUAGE.into(), "(definition) @def")
-            .unwrap();
+        let q = tree_sitter::Query::new(
+            &tree_sitter_lispbm::LANGUAGE.into(),
+            r#"
+            (_
+                (comment)* @doc_comment
+                .
+                (definition name: (symbol) @name )
+                (comment)* @doc_comment)
+            "#,
+        )
+        .unwrap();
 
         let mut cursor = QueryCursor::new();
         let root = tree.root_node();
-        let mut defs = HashMap::<String, _>::new();
+        let mut defs = HashMap::<String, definitions::Definition>::new();
         cursor.matches(&q, root, text.as_bytes()).for_each(|m| {
-            let node = m.captures[0].node;
-            let name_node = node.child_by_field_name("name").unwrap();
-            let name = name_node.utf8_text(text.as_bytes()).unwrap().to_string();
-            defs.insert(name, definitions::Definition::from_def_node(node, path));
+            let (name, def) = definitions::Definition::from_def_match(
+                m.captures,
+                text.as_bytes(),
+                path.to_path_buf(),
+            )
+            .unwrap();
+            defs.insert(name, def);
         });
 
         self.client
