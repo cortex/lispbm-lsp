@@ -21,15 +21,63 @@ impl Definition {
         }
     }
 
-    pub fn from_def_node(def_node: Node, file: &path::Path) -> Self {
-        let comment = None;
-        let line = def_node.start_position().row + 1;
-        let column = def_node.start_position().column + 1;
-        Self {
-            file: file.to_path_buf(),
-            comment,
-            line,
-            column,
+    pub fn from_def_match(
+        captures: &[tree_sitter::QueryCapture],
+        content: &[u8],
+        file: path::PathBuf,
+    ) -> Result<(String, Self), String> {
+        let mut name = None;
+        let mut comment = None;
+
+        let mut line = 0;
+        let mut column = 0;
+
+        for capture in captures.iter() {
+            match capture.index {
+                0 => {
+                    // comment
+                    let c = capture
+                        .node
+                        .utf8_text(content)
+                        .map_err(|e| e.to_string())?
+                        .trim_start_matches(';')
+                        .trim()
+                        .to_string();
+                    if let Some(existing) = comment {
+                        comment = Some(format!("{} {}", existing, c));
+                    } else {
+                        comment = Some(c);
+                    }
+                }
+                1 if name.is_none() => {
+                    // name
+                    name = Some(
+                        capture
+                            .node
+                            .utf8_text(content)
+                            .map_err(|e| e.to_string())?
+                            .to_string(),
+                    );
+                    let start = capture.node.start_position();
+                    line = start.row + 1;
+                    column = start.column + 1;
+                }
+                _ => return Err(format!("Unexpected capture index: {}", capture.index)),
+            }
         }
+
+        if name.is_none() {
+            return Err("Definition match missing name capture".to_string());
+        }
+
+        Ok((
+            name.unwrap(),
+            Self {
+                file,
+                comment,
+                line,
+                column,
+            },
+        ))
     }
 }

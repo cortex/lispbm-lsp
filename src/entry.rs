@@ -53,7 +53,6 @@ impl EntryFile {
 
     pub async fn get_all_imports(
         &self,
-        client: &Client,
         parser: &mut tree_sitter::Parser,
     ) -> Option<Vec<path::PathBuf>> {
         let content = std::fs::read_to_string(&self.entry_point).ok()?;
