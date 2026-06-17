@@ -1,8 +1,8 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, hash_map};
 use std::path;
 
 use tokio::sync::Mutex;
-use tower_lsp_server::jsonrpc::Result;
+use tower_lsp_server::jsonrpc::{self, Result};
 use tower_lsp_server::ls_types::*;
 use tower_lsp_server::{Client, LanguageServer};
 use tree_sitter::{Node, QueryCursor, StreamingIterator, StreamingIteratorMut};
@@ -73,6 +73,8 @@ impl LanguageServer for Backend {
                 text_document_sync: Some(TextDocumentSyncCapability::Kind(
                     TextDocumentSyncKind::FULL,
                 )),
+                definition_provider: Some(OneOf::Left(true)),
+                hover_provider: Some(HoverProviderCapability::Simple(true)),
                 ..Default::default()
             },
             ..Default::default()
@@ -89,11 +91,146 @@ impl LanguageServer for Backend {
             .await;
     }
 
+    async fn goto_definition(
+        &self,
+        params: GotoDefinitionParams,
+    ) -> Result<Option<GotoDefinitionResponse>> {
+        self.client
+            .log_message(
+                MessageType::INFO,
+                format!(
+                    "Received goto type definition request for: {} at line {}, column {}",
+                    params
+                        .text_document_position_params
+                        .text_document
+                        .uri
+                        .path(),
+                    params.text_document_position_params.position.line,
+                    params.text_document_position_params.position.character
+                ),
+            )
+            .await;
+        let state = self.state.lock().await;
+        let mut parser = self.parser.lock().await;
+        let path = params
+            .text_document_position_params
+            .text_document
+            .uri
+            .to_file_path()
+            .ok_or(jsonrpc::Error::new(jsonrpc::ErrorCode::ParseError))?;
+        let entry_path = entry::EntryFile::find_closest_entry_file(&path, &state.root)
+            .ok_or(jsonrpc::Error::new(jsonrpc::ErrorCode::ParseError))?;
+        let defs = state
+            .definitions
+            .get(&entry_path)
+            .ok_or(jsonrpc::Error::new(jsonrpc::ErrorCode::ParseError))?;
+        let content = std::fs::read_to_string(&path)
+            .ok()
+            .ok_or(jsonrpc::Error::new(jsonrpc::ErrorCode::ParseError))?;
+        let tree = parser
+            .parse(content.as_bytes(), None)
+            .ok_or(jsonrpc::Error::new(jsonrpc::ErrorCode::ParseError))?;
+        let pos = params.text_document_position_params.position;
+
+        let point = tree_sitter::Point {
+            row: pos.line as usize,
+            column: pos.character as usize,
+        };
+
+        let node = tree.root_node().descendant_for_point_range(point, point);
+        self.client
+            .log_message(
+                MessageType::INFO,
+                format!(
+                    "Found node at position: kind='{}', is_error={}, is_missing={}",
+                    node.as_ref().map(|n| n.kind()).unwrap_or("<none>"),
+                    node.as_ref().map(|n| n.is_error()).unwrap_or(false),
+                    node.as_ref().map(|n| n.is_missing()).unwrap_or(false),
+                ),
+            )
+            .await;
+        let node = node.ok_or(jsonrpc::Error::new(jsonrpc::ErrorCode::ParseError))?;
+        let symbol = node.utf8_text(content.as_bytes());
+        self.client
+            .log_message(
+                MessageType::INFO,
+                format!(
+                    "Node at position: kind='{}', text='{}'",
+                    node.kind(),
+                    symbol.as_ref().unwrap_or(&"<invalid utf8>"),
+                ),
+            )
+            .await;
+        let symbol = symbol
+            .ok()
+            .ok_or(jsonrpc::Error::new(jsonrpc::ErrorCode::ParseError))?;
+        self.client
+            .log_message(
+                MessageType::INFO,
+                format!(
+                    "Looking for definition of symbol '{}' in entry file: {}",
+                    symbol,
+                    entry_path.display()
+                ),
+            )
+            .await;
+
+        let def = defs.get(symbol);
+        self.client
+            .log_message(
+                MessageType::INFO,
+                format!(
+                    "Definition lookup for symbol '{}': {:?} defs: {:#?}",
+                    symbol, def, defs,
+                ),
+            )
+            .await;
+
+        let def = def.ok_or(jsonrpc::Error::new(jsonrpc::ErrorCode::ServerError(1)))?;
+
+        let loc = Location {
+            uri: Uri::from_file_path(&def.file).unwrap(),
+            range: Range {
+                start: Position {
+                    line: def.line,
+                    character: def.column,
+                },
+                end: Position {
+                    line: def.line,
+                    character: def.column + symbol.len() as u32,
+                },
+            },
+        };
+
+        self.client
+            .log_message(
+                MessageType::INFO,
+                format!(
+                    "Found definition for symbol '{}': {} at line {}, column {}",
+                    symbol,
+                    def.file.display(),
+                    def.line,
+                    def.column
+                ),
+            )
+            .await;
+
+        Ok(Some(request::GotoTypeDefinitionResponse::Scalar(loc)))
+    }
+
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
+        let mut state = self.state.lock().await;
+        let mut parser = self.parser.lock().await;
         // For simplicity, we assume TextDocumentSyncKind::FULL
         if let Some(event) = params.content_changes.first() {
-            self.parse_definitions(&params.text_document.uri, &event.text)
-                .await;
+            Self::parse_definitions(
+                &mut state,
+                &mut parser,
+                &self.client,
+                &params.text_document.uri,
+                &event.text,
+            )
+            .await;
 
             self.on_change(params.text_document.uri, event.text.clone())
                 .await;
@@ -118,7 +255,7 @@ impl Backend {
     }
 
     async fn parse_entry_file(&self, path: &path::Path) {
-        let state = self.state.lock().await;
+        let mut state = self.state.lock().await;
         let mut parser = self.parser.lock().await;
         let entry = match state.entry_files.get(path) {
             Some(entry) => entry,
@@ -143,6 +280,31 @@ impl Backend {
                     ),
                 )
                 .await;
+            for import_path in import_paths {
+                self.client
+                    .log_message(
+                        MessageType::INFO,
+                        format!("Parsing imported file: {}", import_path.display()),
+                    )
+                    .await;
+                if let Ok(content) = std::fs::read_to_string(&import_path) {
+                    Self::parse_definitions(
+                        &mut state,
+                        &mut parser,
+                        &self.client,
+                        &Uri::from_file_path(&import_path).unwrap(),
+                        &content,
+                    )
+                    .await;
+                } else {
+                    self.client
+                        .log_message(
+                            MessageType::ERROR,
+                            format!("Failed to read imported file: {}", import_path.display()),
+                        )
+                        .await;
+                }
+            }
         } else {
             self.client
                 .log_message(
@@ -189,15 +351,19 @@ impl Backend {
         }
     }
 
-    async fn parse_definitions(&self, uri: &Uri, text: &str) {
-        let mut state = self.state.lock().await;
-        let mut parser = self.parser.lock().await;
+    async fn parse_definitions(
+        state: &mut state::State,
+        parser: &mut tree_sitter::Parser,
+        client: &Client,
+        uri: &Uri,
+        text: &str,
+    ) {
         let path = &uri.to_file_path().unwrap();
         let entry_path =
             match entry::EntryFile::find_closest_entry_file(path.parent().unwrap(), &state.root) {
                 Some(s) => s,
                 None => {
-                    self.client
+                    client
                         .log_message(
                             MessageType::ERROR,
                             format!(
@@ -238,12 +404,21 @@ impl Backend {
             defs.insert(name, def);
         });
 
-        self.client
+        client
             .log_message(
                 MessageType::INFO,
                 format!("Parsed definitions for: {}: {:#?}", uri.path(), defs),
             )
             .await;
-        state.definitions.insert(entry_path, defs);
+        // if exists, extend hashmap; otherwise insert
+        let entry = state.definitions.entry(entry_path);
+        match entry {
+            hash_map::Entry::Occupied(mut e) => {
+                e.get_mut().extend(defs);
+            }
+            hash_map::Entry::Vacant(e) => {
+                e.insert(defs);
+            }
+        }
     }
 }
