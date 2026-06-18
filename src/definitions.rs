@@ -26,52 +26,84 @@ impl Definition {
         content: &[u8],
         file: path::PathBuf,
     ) -> Result<(String, Self), String> {
-        let mut name = None;
+        let node = captures
+            .iter()
+            .find(|c| c.index == 2)
+            .ok_or("Definition match missing name capture")?
+            .node;
+        let node_start_line = node.start_position().row as u32;
+        let node_end_line = node.start_position().column as u32;
+
+        let name_node = captures
+            .iter()
+            .find(|c| c.index == 1)
+            .ok_or("Definition match missing name capture".to_string())?;
+
+        let line = name_node.node.start_position().row as u32;
+        let column = name_node.node.start_position().column as u32;
+
+        let name = name_node
+            .node
+            .utf8_text(content)
+            .map_err(|e| e.to_string())
+            .map(|s| s.to_string())?;
+
         let mut comment = None;
 
-        let mut line: u32 = 0;
-        let mut column: u32 = 0;
+        let mut all_nodes_above_definition = captures
+            .iter()
+            .filter(|c| c.node.start_position().row < node_start_line as usize)
+            .map(|c| c.node)
+            .collect::<Vec<_>>();
+        all_nodes_above_definition.sort_by_key(|n| n.start_position().row);
+        all_nodes_above_definition.reverse();
 
-        for capture in captures.iter() {
-            match capture.index {
-                0 => {
-                    // comment
-                    let c = capture
-                        .node
-                        .utf8_text(content)
-                        .map_err(|e| e.to_string())?
-                        .trim_start_matches(';')
-                        .trim()
-                        .to_string();
+        // Check for comments above the definition, by line number
+        let mut current_line = node_start_line;
+        for comment_node in all_nodes_above_definition {
+            if comment_node.start_position().row as u32 == current_line - 1 {
+                let c = comment_node
+                    .utf8_text(content)
+                    .map_err(|e| e.to_string())?
+                    .trim_start_matches(';')
+                    .trim()
+                    .to_string();
+                if !c.is_empty() {
                     if let Some(existing) = comment {
-                        comment = Some(format!("{} {}", existing, c));
+                        comment = Some(format!("{} {}", c, existing));
                     } else {
                         comment = Some(c);
                     }
                 }
-                1 if name.is_none() => {
-                    // name
-                    name = Some(
-                        capture
-                            .node
-                            .utf8_text(content)
-                            .map_err(|e| e.to_string())?
-                            .to_string(),
-                    );
-                    let start = capture.node.start_position();
-                    line = start.row as u32;
-                    column = start.column as u32;
-                }
-                _ => return Err(format!("Unexpected capture index: {}", capture.index)),
+                current_line -= 1;
+            } else {
+                break;
             }
         }
 
-        if name.is_none() {
-            return Err("Definition match missing name capture".to_string());
+        let comment_node_at_end_line = captures
+            .iter()
+            .find(|c| c.index == 0 && c.node.start_position().row as u32 == node_end_line)
+            .map(|c| c.node);
+
+        if let Some(comment_node) = comment_node_at_end_line {
+            let c = comment_node
+                .utf8_text(content)
+                .map_err(|e| e.to_string())?
+                .trim_start_matches(';')
+                .trim()
+                .to_string();
+            if !c.is_empty() {
+                if let Some(existing) = comment {
+                    comment = Some(format!("{} {}", existing, c));
+                } else {
+                    comment = Some(c);
+                }
+            }
         }
 
         Ok((
-            name.unwrap(),
+            name,
             Self {
                 file,
                 comment,

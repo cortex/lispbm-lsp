@@ -6,13 +6,13 @@ use tree_sitter::{QueryCursor, StreamingIterator};
 
 use crate::definitions::Definition;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EntryFile {
     pub entry_point: path::PathBuf,
     pub extension: Vec<Extension>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Extension {
     Path(path::PathBuf),
