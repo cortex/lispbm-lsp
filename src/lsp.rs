@@ -136,23 +136,14 @@ impl LanguageServer for Backend {
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
-        let path: path::PathBuf = params.text_document.uri.to_file_path().unwrap().into();
-        let state = self.state.lock().await;
-        if !state.file_to_entry.contains_key(&path) {
-            // if file is not part of any entry file, re-index workspace, could be a new file created in the workspace
-            self.client
-                .log_message(
-                    MessageType::INFO,
-                    format!(
-                        "TODO: Opened file {} is not part of any entry file, re-indexing workspace",
-                        path.display()
-                    ),
-                )
-                .await;
-        }
-
-        self.on_change(params.text_document.uri, params.text_document.text)
-            .await;
+        let mut parser = self.parser.lock().await;
+        Self::on_change(
+            &mut parser,
+            &self.client,
+            params.text_document.uri,
+            params.text_document.text,
+        )
+        .await;
     }
 
     async fn goto_definition(
@@ -259,10 +250,7 @@ impl LanguageServer for Backend {
             self.client
                 .log_message(
                     MessageType::INFO,
-                    format!(
-                        "Definition lookup for symbol '{}': {:?} defs: {:#?}",
-                        symbol, def, defs,
-                    ),
+                    format!("Definition lookup for symbol '{}': {:?}", symbol, def,),
                 )
                 .await;
 
@@ -391,10 +379,10 @@ impl LanguageServer for Backend {
     }
 
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
-        let mut state = self.state.lock().await;
-        let mut parser = self.parser.lock().await;
         // For simplicity, we assume TextDocumentSyncKind::FULL
         if let Some(event) = params.content_changes.first() {
+            let mut state = self.state.lock().await;
+            let mut parser = self.parser.lock().await;
             let path: path::PathBuf = params.text_document.uri.to_file_path().unwrap().into();
             let entry_ids = state.file_to_entry.get(&path).unwrap_or(&vec![]).clone();
             for entry_id in entry_ids {
@@ -423,10 +411,24 @@ impl LanguageServer for Backend {
                         state.definitions.insert(entry_id.clone(), defs);
                     }
                 };
+                self.client
+                    .log_message(
+                        MessageType::INFO,
+                        format!(
+                            "Updated definitions for entry file {}",
+                            entry_id.0.display(),
+                        ),
+                    )
+                    .await;
             }
 
-            self.on_change(params.text_document.uri, event.text.clone())
-                .await;
+            Self::on_change(
+                &mut parser,
+                &self.client,
+                params.text_document.uri,
+                event.text.clone(),
+            )
+            .await;
         }
     }
     async fn shutdown(&self) -> Result<()> {
@@ -435,16 +437,13 @@ impl LanguageServer for Backend {
 }
 
 impl Backend {
-    async fn on_change(&self, uri: Uri, text: String) {
-        let mut parser = self.parser.lock().await;
+    async fn on_change(parser: &mut tree_sitter::Parser, client: &Client, uri: Uri, text: String) {
         let tree = parser.parse(&text, None).unwrap();
 
         let mut diagnostics = Vec::new();
         collect_syntax_errors(tree.root_node(), &mut diagnostics);
 
-        self.client
-            .publish_diagnostics(uri, diagnostics, None)
-            .await;
+        client.publish_diagnostics(uri, diagnostics, None).await;
     }
 
     async fn parse_entry_file(
@@ -459,10 +458,9 @@ impl Backend {
                 .log_message(
                     MessageType::INFO,
                     format!(
-                        "Found {} imports in entry file {}: {:#?}",
+                        "Found {} imports in entry file {}",
                         import_paths.len(),
                         entry_path.display(),
-                        import_paths,
                     ),
                 )
                 .await;
@@ -556,7 +554,7 @@ impl Backend {
         client
             .log_message(
                 MessageType::INFO,
-                format!("Parsed definitions for: {}: {:#?}", uri.path(), defs),
+                format!("Parsed definitions for: {}", uri.path()),
             )
             .await;
 

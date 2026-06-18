@@ -32,7 +32,7 @@ impl Definition {
             .ok_or("Definition match missing name capture")?
             .node;
         let node_start_line = node.start_position().row as u32;
-        let node_end_line = node.start_position().column as u32;
+        let node_end_line = node.end_position().row as u32;
 
         let name_node = captures
             .iter()
@@ -52,7 +52,7 @@ impl Definition {
 
         let mut all_nodes_above_definition = captures
             .iter()
-            .filter(|c| c.node.start_position().row < node_start_line as usize)
+            .filter(|c| c.index == 0 && c.node.start_position().row < node_start_line as usize)
             .map(|c| c.node)
             .collect::<Vec<_>>();
         all_nodes_above_definition.sort_by_key(|n| n.start_position().row);
