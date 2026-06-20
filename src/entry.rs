@@ -38,8 +38,8 @@ impl EntryFile {
         None
     }
 
-    pub fn load_from_file(path: &path::Path) -> Result<Self, std::io::Error> {
-        let content = std::fs::read_to_string(path)?;
+    pub async fn load_from_file(path: &path::Path) -> Result<Self, std::io::Error> {
+        let content = tokio::fs::read_to_string(path).await?;
         let mut entry_file: EntryFile =
             toml::from_str(&content).map_err(|_| std::io::ErrorKind::InvalidInput)?;
         entry_file.entry_point = path
@@ -55,7 +55,7 @@ impl EntryFile {
         &self,
         parser: &mut tree_sitter::Parser,
     ) -> Option<Vec<path::PathBuf>> {
-        let content = std::fs::read_to_string(&self.entry_point).ok()?;
+        let content = tokio::fs::read_to_string(&self.entry_point).await.ok()?;
         let tree = parser.parse(&content, None)?;
         let q = tree_sitter::Query::new(
             &tree_sitter_lispbm::LANGUAGE.into(),
