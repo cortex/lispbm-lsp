@@ -1,24 +1,64 @@
-use std::path;
+use std::{collections::HashMap, path};
 
 use serde::{Deserialize, Serialize};
-use tree_sitter::Node;
+use tree_sitter::{Node, QueryCursor, StreamingIterator};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Definition {
     pub file: path::PathBuf,
     pub comment: Option<String>,
     pub line: u32,
     pub column: u32,
+    pub len: u32,
 }
 
 impl Definition {
-    pub fn new(file: path::PathBuf, comment: Option<String>, line: u32, column: u32) -> Self {
+    pub fn new(
+        file: path::PathBuf,
+        comment: Option<String>,
+        line: u32,
+        column: u32,
+        len: u32,
+    ) -> Self {
         Self {
             file,
             comment,
             line,
             column,
+            len,
         }
+    }
+
+    pub fn parse_definitions(
+        tree: &tree_sitter::Tree,
+        path: &path::PathBuf,
+        content: &[u8],
+    ) -> Result<HashMap<String, Self>, String> {
+        let q = tree_sitter::Query::new(
+            &tree_sitter_lispbm::LANGUAGE.into(),
+            r#"
+            (_
+                (comment)* @doc_comment
+                .
+                [
+                  (definition name: (symbol) @name ) @node
+                  (function_definition name: (symbol) @name ) @node
+                ]
+                .
+                (comment)* @doc_comment)
+            "#,
+        )
+        .unwrap();
+
+        let mut cursor = QueryCursor::new();
+        let root = tree.root_node();
+        let mut defs = HashMap::<String, Self>::new();
+        cursor.matches(&q, root, content).for_each(|m| {
+            let (name, def) = Self::from_def_match(m.captures, content, path.clone()).unwrap();
+            defs.insert(name, def);
+        });
+
+        Ok(defs)
     }
 
     pub fn from_def_match(
@@ -41,6 +81,7 @@ impl Definition {
 
         let line = name_node.node.start_position().row as u32;
         let column = name_node.node.start_position().column as u32;
+        let len = name_node.node.end_position().column as u32 - column;
 
         let name = name_node
             .node
@@ -109,6 +150,7 @@ impl Definition {
                 comment,
                 line,
                 column,
+                len,
             },
         ))
     }
