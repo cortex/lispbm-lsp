@@ -1,7 +1,7 @@
 use std::{collections::HashMap, path};
 
 use serde::{Deserialize, Serialize};
-use tree_sitter::{Node, QueryCursor, StreamingIterator};
+use tree_sitter::{QueryCursor, StreamingIterator};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Definition {
@@ -13,27 +13,11 @@ pub struct Definition {
 }
 
 impl Definition {
-    pub fn new(
-        file: path::PathBuf,
-        comment: Option<String>,
-        line: u32,
-        column: u32,
-        len: u32,
-    ) -> Self {
-        Self {
-            file,
-            comment,
-            line,
-            column,
-            len,
-        }
-    }
-
     pub fn parse_definitions(
         tree: &tree_sitter::Tree,
-        path: &path::PathBuf,
+        path: &path::Path,
         content: &[u8],
-    ) -> Result<HashMap<String, Self>, String> {
+    ) -> Result<HashMap<String, Vec<Self>>, String> {
         let q = tree_sitter::Query::new(
             &tree_sitter_lispbm::LANGUAGE.into(),
             r#"
@@ -52,10 +36,10 @@ impl Definition {
 
         let mut cursor = QueryCursor::new();
         let root = tree.root_node();
-        let mut defs = HashMap::<String, Self>::new();
+        let mut defs = HashMap::<String, Vec<Self>>::new();
         cursor.matches(&q, root, content).for_each(|m| {
-            let (name, def) = Self::from_def_match(m.captures, content, path.clone()).unwrap();
-            defs.insert(name, def);
+            let (name, def) = Self::from_def_match(m.captures, content, path.into()).unwrap();
+            defs.entry(name).or_default().push(def);
         });
 
         Ok(defs)
@@ -136,7 +120,12 @@ impl Definition {
                 .to_string();
             if !c.is_empty() {
                 if let Some(existing) = comment {
-                    comment = Some(format!("{} {}", existing, c));
+                    // if the comment is on the same line as the definition, only use the comment after the definition
+                    if comment_node.start_position().row as u32 == line {
+                        comment = Some(c);
+                    } else {
+                        comment = Some(format!("{} {}", existing, c));
+                    }
                 } else {
                     comment = Some(c);
                 }

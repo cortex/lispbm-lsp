@@ -1,42 +1,12 @@
-use std::collections::{HashMap, hash_map};
-use std::os::linux::raw::stat;
 use std::path;
 
-use tokio::sync::{self, Mutex};
-use tower_lsp_server::jsonrpc::{self, Result};
+use tokio::sync;
+use tower_lsp_server::jsonrpc::Result;
 use tower_lsp_server::ls_types::*;
 use tower_lsp_server::{Client, LanguageServer};
-use tree_sitter::{Node, QueryCursor, StreamingIterator, StreamingIteratorMut};
+use tracing::info;
 
-use crate::{definitions, entry, state};
-
-pub fn collect_syntax_errors(node: Node, diagnostics: &mut Vec<Diagnostic>) {
-    if node.is_error() || node.is_missing() {
-        let range = Range {
-            start: Position::new(
-                node.start_position().row as u32,
-                node.start_position().column as u32,
-            ),
-            end: Position::new(
-                node.end_position().row as u32,
-                node.end_position().column as u32,
-            ),
-        };
-
-        diagnostics.push(Diagnostic {
-            range,
-            severity: Some(DiagnosticSeverity::ERROR),
-            message: format!("Syntax error: unexpected {}", node.kind()),
-            ..Default::default()
-        });
-    }
-
-    // Recursively check children
-    let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        collect_syntax_errors(child, diagnostics);
-    }
-}
+use crate::state;
 
 pub struct Backend {
     pub client: Client,
@@ -94,10 +64,25 @@ impl LanguageServer for Backend {
             .unwrap()
             .await;
 
+        self.client
+            .log_message(
+                MessageType::INFO,
+                "LispBM LSP Server capabilities sent".to_string(),
+            )
+            .await;
+
         Ok(InitializeResult {
             capabilities: ServerCapabilities {
-                text_document_sync: Some(TextDocumentSyncCapability::Kind(
-                    TextDocumentSyncKind::FULL,
+                text_document_sync: Some(TextDocumentSyncCapability::Options(
+                    TextDocumentSyncOptions {
+                        open_close: Some(true),
+                        change: Some(TextDocumentSyncKind::FULL),
+                        will_save: Some(false),
+                        will_save_wait_until: Some(false),
+                        save: Some(TextDocumentSyncSaveOptions::SaveOptions(SaveOptions {
+                            include_text: Some(true), // true if you want the file contents in the params
+                        })),
+                    },
                 )),
                 definition_provider: Some(OneOf::Left(true)),
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
@@ -109,13 +94,13 @@ impl LanguageServer for Backend {
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
         let path: path::PathBuf = params.text_document.uri.to_file_path().unwrap().into();
-        let content = params.text_document.text.clone();
+        let content = params.text_document.text;
 
         let (tx, rx) = tokio::sync::oneshot::channel();
         self.state
             .send(state::Request::GetDiagnostics {
-                file: path,
-                content,
+                file: path.clone(),
+                content: content.clone(),
                 update: true,
                 response: tx,
             })
@@ -137,6 +122,14 @@ impl LanguageServer for Backend {
                     .await;
             }
         }
+
+        self.state
+            .send(state::Request::UpdateDefinitions {
+                file: path,
+                content,
+            })
+            .await
+            .unwrap();
     }
 
     async fn goto_definition(
@@ -194,6 +187,16 @@ impl LanguageServer for Backend {
         let line = params.text_document_position_params.position.line;
         let column = params.text_document_position_params.position.character;
 
+        self.client
+            .log_message(
+                MessageType::INFO,
+                format!(
+                    "Received hover request for: {} at line {}, column {}",
+                    path, line, column
+                ),
+            )
+            .await;
+
         let (tx, rx) = tokio::sync::oneshot::channel();
         self.state
             .send(state::Request::GetHover {
@@ -211,10 +214,15 @@ impl LanguageServer for Backend {
     }
 
     async fn did_save(&self, params: DidSaveTextDocumentParams) {
+        info!("File saved");
         let path: path::PathBuf = params.text_document.uri.to_file_path().unwrap().into();
+        let content = params.text.unwrap_or_default();
 
         self.state
-            .send(state::Request::UpdateDefinitions { file: path })
+            .send(state::Request::UpdateDefinitions {
+                file: path,
+                content,
+            })
             .await
             .unwrap();
     }
@@ -260,7 +268,7 @@ impl LanguageServer for Backend {
 
 impl Backend {
     pub fn new(client: Client) -> Self {
-        let (tx, rx) = sync::mpsc::channel::<state::Request>(16);
+        let (tx, rx) = sync::mpsc::channel::<state::Request>(32);
 
         let mut state = state::State::new(rx);
         tokio::spawn(async move {
