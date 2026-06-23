@@ -2,8 +2,8 @@ use std::{collections::HashMap, path, str, vec};
 
 use derivative::Derivative;
 use tokio::sync;
-use tower_lsp_server::ls_types::{self, DiagnosticSeverity, lsif::Edge::Diagnostic};
-use tracing::dispatcher;
+use tower_lsp_server::ls_types::{self, DiagnosticSeverity};
+use tracing::{info, warn};
 use tree_sitter::{QueryCursor, StreamingIterator};
 
 use crate::{
@@ -54,6 +54,7 @@ pub enum Request {
     },
     UpdateDefinitions {
         file: path::PathBuf,
+        content: String,
     },
     GetDiagnostics {
         file: path::PathBuf,
@@ -66,7 +67,7 @@ pub enum Request {
 #[derive(Debug)]
 pub struct EntryData {
     pub file: entry::EntryFile,
-    pub definitions: HashMap<String, Definition>,
+    pub definitions: HashMap<String, Vec<Definition>>,
 }
 
 #[derive(Debug)]
@@ -106,33 +107,55 @@ impl State {
     async fn new_entry(&mut self, id: EntryId) {
         let entry_file = entry::EntryFile::load_from_file(&id.0).await.unwrap();
         let imports = entry_file.get_all_imports(&mut self.parser).await.unwrap();
+        info!("New entry: {:?}, imports: {:?}", id, imports);
+
+        self.import_file(&entry_file, entry_file.entry_point.clone(), &id)
+            .await;
 
         for import in imports {
-            let content = tokio::fs::read_to_string(&import).await.unwrap();
-            let tree = self.parser.parse(&content, None).unwrap();
-            let defs =
-                definitions::Definition::parse_definitions(&tree, &import, content.as_bytes())
-                    .unwrap();
+            self.import_file(&entry_file, import, &id).await;
+        }
+    }
 
-            self.files
-                .entry(import)
-                .and_modify(|f| f.entry_files.push(id.clone()))
-                .or_insert(File {
-                    entry_files: vec![id.clone()],
-                    tree,
-                });
+    async fn import_file(
+        &mut self,
+        entry_file: &entry::EntryFile,
+        import: path::PathBuf,
+        id: &EntryId,
+    ) {
+        let content = tokio::fs::read_to_string(&import).await.unwrap();
+        let tree = self.parser.parse(&content, None).unwrap();
+        let mut defs =
+            definitions::Definition::parse_definitions(&tree, &import, content.as_bytes()).unwrap();
+        info!(
+            "Adding definitions for {} in entry {:?} with {} definitions",
+            import.file_name().unwrap().display(),
+            id.0.file_name().unwrap().display(),
+            defs.len()
+        );
 
-            match self.entry_files.get_mut(&id) {
-                Some(e) => e.definitions.extend(defs),
-                None => {
-                    self.entry_files.insert(
-                        id.clone(),
-                        EntryData {
-                            file: entry_file.clone(),
-                            definitions: defs,
-                        },
-                    );
+        self.files
+            .entry(import)
+            .and_modify(|f| f.entry_files.push(id.clone()))
+            .or_insert(File {
+                entry_files: vec![id.clone()],
+                tree,
+            });
+
+        match self.entry_files.get_mut(id) {
+            Some(e) => e.definitions.iter_mut().for_each(|(name, def)| {
+                if let Some(new_def) = defs.remove(name) {
+                    def.extend(new_def);
                 }
+            }),
+            None => {
+                self.entry_files.insert(
+                    id.clone(),
+                    EntryData {
+                        file: entry_file.clone(),
+                        definitions: defs,
+                    },
+                );
             }
         }
     }
@@ -179,9 +202,9 @@ impl State {
                     },
                     severity: Some(DiagnosticSeverity::ERROR),
                     message: format!(
-                        "{} error: {}",
+                        "{}: {}",
                         node.kind(),
-                        cap.node.utf8_text(content.as_bytes()).unwrap_or("".into())
+                        cap.node.utf8_text(content.as_bytes()).unwrap_or("")
                     ),
                     ..Default::default()
                 });
@@ -191,18 +214,34 @@ impl State {
         diagnostics
     }
 
-    async fn update_definitions(&mut self, file: path::PathBuf) {
+    async fn update_definitions(&mut self, file: path::PathBuf, content: &[u8]) {
         if let Some(f) = self.files.get(&file) {
-            let content = tokio::fs::read_to_string(&file).await.unwrap();
-            let defs =
-                definitions::Definition::parse_definitions(&f.tree, &file, content.as_bytes())
-                    .unwrap();
+            let mut defs =
+                definitions::Definition::parse_definitions(&f.tree, &file, content).unwrap();
 
-            for (name, def) in defs.into_iter() {
-                for entry_id in &f.entry_files {
-                    if let Some(entry_data) = self.entry_files.get_mut(entry_id) {
-                        entry_data.definitions.insert(name.clone(), def.clone());
+            for entry_id in &f.entry_files {
+                if let Some(entry_data) = self.entry_files.get_mut(entry_id) {
+                    for (name, def) in entry_data.definitions.iter_mut() {
+                        def.retain(|d| d.file != file);
+                        if let Some(new_def) = defs.remove(name) {
+                            def.extend(new_def);
+                        }
                     }
+
+                    // Add new definitions that are present in the file but not in the entry file
+                    for (name, new_def) in defs.iter() {
+                        entry_data
+                            .definitions
+                            .entry(name.clone())
+                            .or_insert_with(Vec::new)
+                            .extend(new_def.clone());
+                    }
+
+                    info!(
+                        "Updated definitions for entry {:?} with total {} definitions",
+                        entry_id,
+                        entry_data.definitions.len()
+                    )
                 }
             }
         }
@@ -226,16 +265,22 @@ impl State {
             },
         );
 
+        let node_text = node.as_ref().map(|n| n.utf8_text(content));
+        info!(
+            "Getting definition for node {:?} at line {}, column {}",
+            node_text, line, column
+        );
+
         let mut total_defs = vec![];
 
         if let Some(node) = node {
             let name = node.utf8_text(content);
             if let Ok(name) = name {
                 for entry_id in &file.entry_files {
-                    if let Some(entry_data) = self.entry_files.get(entry_id) {
-                        if let Some(def) = entry_data.definitions.get(name) {
-                            total_defs.push(def);
-                        }
+                    if let Some(entry_data) = self.entry_files.get(entry_id)
+                        && let Some(def) = entry_data.definitions.get(name)
+                    {
+                        total_defs.extend(def);
                     }
                 }
             }
@@ -247,6 +292,7 @@ impl State {
     fn update_tree(&mut self, path: &path::PathBuf, content: &str) {
         let tree = self.parser.parse(content, None).unwrap();
         if let Some(f) = self.files.get_mut(path) {
+            info!("Updating tree for file {:?}", path);
             f.tree = tree;
         }
     }
@@ -256,6 +302,7 @@ impl State {
             match request {
                 Request::SetRoot { path } => {
                     self.root = path;
+                    info!("Set root path to {:?}", self.root);
                 }
                 Request::NewEntry { id } => {
                     self.new_entry(id).await;
@@ -266,26 +313,14 @@ impl State {
                     column,
                     response,
                 } => {
-                    let content = tokio::fs::read_to_string(&file).await.unwrap();
-                    let file = self.files.get(&file).unwrap();
-                    let locations = self
-                        .get_definition(content.as_bytes(), line, column, file)
-                        .await
-                        .iter()
-                        .map(|d| ls_types::Location {
-                            uri: ls_types::Uri::from_file_path(&d.file).unwrap(),
-                            range: ls_types::Range {
-                                start: ls_types::Position {
-                                    line: d.line,
-                                    character: d.column,
-                                },
-                                end: ls_types::Position {
-                                    line: d.line,
-                                    character: d.column + d.len,
-                                },
-                            },
-                        })
-                        .collect::<Vec<_>>();
+                    let locations = match self.handle_definition(file, line, column).await {
+                        Ok(l) => l,
+                        Err(e) => {
+                            warn!("{e}");
+                            let _ = response.send(vec![]);
+                            continue;
+                        }
+                    };
                     let _ = response.send(locations);
                 }
                 Request::GetHover {
@@ -294,48 +329,19 @@ impl State {
                     column,
                     response,
                 } => {
-                    let content = tokio::fs::read_to_string(&file).await.unwrap();
-                    let file = self.files.get(&file).unwrap();
-                    let defs = self
-                        .get_definition(content.as_bytes(), line, column, file)
-                        .await;
-                    if defs.is_empty() {
-                        let _ = response.send(None);
-                        continue;
-                    }
-                    let len = defs.iter().map(|d| d.len).max().unwrap_or(0);
-                    let hover_text = defs
-                        .iter()
-                        .filter_map(|def| {
-                            def.comment.as_ref().map(|comment| {
-                                format!(
-                                    "{}\n\n__{}__",
-                                    comment,
-                                    def.file.file_name().unwrap().display(),
-                                )
-                            })
-                        })
-                        .collect::<Vec<_>>()
-                        .join("\n");
-                    let hover = ls_types::Hover {
-                        contents: ls_types::HoverContents::Scalar(ls_types::MarkedString::String(
-                            hover_text.clone(),
-                        )),
-                        range: Some(ls_types::Range {
-                            start: ls_types::Position {
-                                line,
-                                character: column,
-                            },
-                            end: ls_types::Position {
-                                line,
-                                character: column + len,
-                            },
-                        }),
+                    let hover = match self.handle_hover(file, line, column).await {
+                        Ok(h) => h,
+                        Err(e) => {
+                            warn!("{e}");
+                            let _ = response.send(None);
+                            continue;
+                        }
                     };
-                    let _ = response.send(Some(hover));
+                    let _ = response.send(hover);
                 }
-                Request::UpdateDefinitions { file } => {
-                    self.update_definitions(file).await;
+                Request::UpdateDefinitions { file, content } => {
+                    info!("Updating definitions for file {:?}", &file);
+                    self.update_definitions(file, content.as_bytes()).await;
                 }
                 Request::GetDiagnostics {
                     file,
@@ -352,4 +358,120 @@ impl State {
             }
         }
     }
+
+    async fn handle_hover(
+        &mut self,
+        file: path::PathBuf,
+        line: u32,
+        column: u32,
+    ) -> Result<Option<ls_types::Hover>, String> {
+        info!(
+            "Handling hover request for file {:?} at line {}, column {}",
+            file, line, column
+        );
+        let content = tokio::fs::read_to_string(&file)
+            .await
+            .map_err(|e| e.to_string())?;
+        let file = self.files.get(&file).ok_or("File not found")?;
+        let defs = self
+            .get_definition(content.as_bytes(), line, column, file)
+            .await;
+        if defs.is_empty() {
+            info!("No definitions found for hover at {}:{}", line, column);
+            return Ok(None);
+        }
+        let node_under_pos = node_at(&file.tree, line, column);
+        let line = node_under_pos.start_position().row as u32;
+        let column = node_under_pos.start_position().column as u32;
+        let len = node_under_pos.end_position().column as u32 - column;
+        let hover_text = defs
+            .iter()
+            .filter_map(|def| {
+                info!(
+                    "Hover text for definition {} at {}:{} is: {:?}",
+                    def.file.display(),
+                    def.line,
+                    def.column,
+                    def.comment
+                );
+                def.comment.as_ref().map(|comment| {
+                    format!(
+                        "{}\n\n__{}__",
+                        comment,
+                        def.file.file_name().unwrap().display(),
+                    )
+                })
+            })
+            .collect::<Vec<_>>()
+            .join("\n\n---\n\n");
+        info!("Hover text for {}:{} is: {:?}", line, column, hover_text);
+        let hover = ls_types::Hover {
+            contents: ls_types::HoverContents::Scalar(ls_types::MarkedString::String(hover_text)),
+            range: Some(ls_types::Range {
+                start: ls_types::Position {
+                    line,
+                    character: column,
+                },
+                end: ls_types::Position {
+                    line,
+                    character: column + len,
+                },
+            }),
+        };
+        Ok(Some(hover))
+    }
+
+    async fn handle_definition(
+        &mut self,
+        file: path::PathBuf,
+        line: u32,
+        column: u32,
+    ) -> Result<Vec<ls_types::Location>, String> {
+        let content = tokio::fs::read_to_string(&file)
+            .await
+            .map_err(|e| e.to_string())?;
+        let file = self.files.get(&file).ok_or("File not found in state")?;
+        let locations = self
+            .get_definition(content.as_bytes(), line, column, file)
+            .await;
+
+        info!(
+            "Found {:?} definitions at line {}, column {}",
+            locations, line, column
+        );
+
+        let locations = locations
+            .iter()
+            .map(|d| ls_types::Location {
+                uri: ls_types::Uri::from_file_path(&d.file).unwrap(),
+                range: ls_types::Range {
+                    start: ls_types::Position {
+                        line: d.line,
+                        character: d.column,
+                    },
+                    end: ls_types::Position {
+                        line: d.line,
+                        character: d.column + d.len,
+                    },
+                },
+            })
+            .collect::<Vec<_>>();
+
+        Ok(locations)
+    }
+}
+
+fn node_at(tree: &tree_sitter::Tree, line: u32, column: u32) -> tree_sitter::Node<'_> {
+    tree.root_node()
+        .descendant_for_point_range(
+            tree_sitter::Point {
+                row: line as usize,
+                column: column as usize,
+            },
+            tree_sitter::Point {
+                row: line as usize,
+                column: column as usize,
+            },
+        )
+        .unwrap()
 }

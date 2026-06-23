@@ -1,10 +1,7 @@
-use std::{collections::HashMap, path};
+use std::path;
 
 use serde::{Deserialize, Serialize};
-use tower_lsp_server::{Client, ls_types::MessageType};
 use tree_sitter::{QueryCursor, StreamingIterator};
-
-use crate::definitions::Definition;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EntryFile {
@@ -21,23 +18,6 @@ pub enum Extension {
 }
 
 impl EntryFile {
-    pub fn find_closest_entry_file(path: &path::Path, root: &path::Path) -> Option<path::PathBuf> {
-        let mut current = path.strip_prefix(root).ok()?;
-        const MAX_DEPTH: usize = 10;
-        for _ in 0..MAX_DEPTH {
-            let entry_path = current.join("entry.toml");
-            if entry_path.exists() {
-                return Some(entry_path);
-            }
-            if let Some(parent) = current.parent() {
-                current = parent;
-            } else {
-                break;
-            }
-        }
-        None
-    }
-
     pub async fn load_from_file(path: &path::Path) -> Result<Self, std::io::Error> {
         let content = tokio::fs::read_to_string(path).await?;
         let mut entry_file: EntryFile =
