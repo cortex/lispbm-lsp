@@ -39,6 +39,32 @@ pub struct DefinitionFile {
     pub definitions: Vec<Definition>,
 }
 
+impl DefinitionFile {
+    pub fn get_definitions(
+        &self,
+        path: &path::Path,
+    ) -> HashMap<String, Vec<definitions::Definition>> {
+        self.definitions
+            .iter()
+            .map(|def| {
+                let (name, comment) = match def {
+                    Definition::Full { name, comment } => (name.clone(), comment.clone()),
+                    Definition::Inline(name) => (name.clone(), None),
+                };
+                (
+                    name,
+                    vec![definitions::Definition {
+                        comment,
+                        source: SourceInfo::Collection {
+                            path: path.to_path_buf(),
+                        },
+                    }],
+                )
+            })
+            .collect()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Builtin {
@@ -100,6 +126,71 @@ impl EntryFile {
         });
 
         Some(paths)
+    }
+
+    pub fn get_ext_imports(&self) -> Vec<path::PathBuf> {
+        let mut paths = vec![];
+        for ext in &self.extension {
+            match ext {
+                Extension::Collection(path_buf) => {
+                    let path = self
+                        .entry_point
+                        .parent()
+                        .unwrap()
+                        .join(path_buf)
+                        .canonicalize()
+                        .unwrap();
+                    paths.push(path);
+                }
+                Extension::Inline(_) => {
+                    let path = self.entry_point.clone();
+                    paths.push(path);
+                }
+                _ => {}
+            }
+        }
+
+        paths
+    }
+
+    pub fn get_ext_builtins(&self) -> Vec<Builtin> {
+        let mut builtins = vec![];
+        for ext in &self.extension {
+            match ext {
+                Extension::Builtin(builtin) => {
+                    builtins.push(builtin.clone());
+                }
+                _ => {}
+            }
+        }
+
+        builtins
+    }
+
+    pub fn get_ext_inline_definitions(&self) -> HashMap<String, Vec<definitions::Definition>> {
+        self.extension
+            .iter()
+            .filter_map(|ext| match ext {
+                Extension::Inline(definitions) => Some(definitions),
+                _ => None,
+            })
+            .flatten()
+            .map(|def| {
+                let (name, comment) = match def {
+                    Definition::Full { name, comment } => (name.clone(), comment.clone()),
+                    Definition::Inline(name) => (name.clone(), None),
+                };
+                (
+                    name,
+                    vec![definitions::Definition {
+                        comment,
+                        source: SourceInfo::Collection {
+                            path: self.entry_point.clone(),
+                        },
+                    }],
+                )
+            })
+            .collect()
     }
 
     pub async fn get_all_ext_definitions(&self) -> HashMap<String, Vec<definitions::Definition>> {
