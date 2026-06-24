@@ -1,8 +1,11 @@
-use std::{collections::HashMap, path, str, vec};
+use std::{
+    collections::{HashMap, HashSet},
+    path, str, vec,
+};
 
 use derivative::Derivative;
 use tokio::sync;
-use tower_lsp_server::ls_types::{self, DiagnosticSeverity};
+use tower_lsp_server::ls_types::{self, DiagnosticSeverity, MonikerKind::Import};
 use tracing::{error, info, warn};
 use tree_sitter::{QueryCursor, StreamingIterator};
 
@@ -29,6 +32,27 @@ impl AsRef<path::Path> for EntryId {
 impl From<String> for EntryId {
     fn from(value: String) -> Self {
         EntryId(path::PathBuf::from(value))
+    }
+}
+
+#[derive(Debug, Hash, Clone, PartialEq, Eq)]
+pub struct FileId(pub path::PathBuf);
+
+impl From<path::PathBuf> for FileId {
+    fn from(value: path::PathBuf) -> Self {
+        FileId(value)
+    }
+}
+
+impl AsRef<path::Path> for FileId {
+    fn as_ref(&self) -> &path::Path {
+        &self.0
+    }
+}
+
+impl From<String> for FileId {
+    fn from(value: String) -> Self {
+        FileId(path::PathBuf::from(value))
     }
 }
 
@@ -65,23 +89,20 @@ pub enum Request {
 }
 
 #[derive(Debug)]
-pub struct EntryData {
-    pub file: entry::EntryFile,
-    pub definitions: HashMap<String, Vec<Definition>>,
-}
-
-#[derive(Debug)]
 pub struct File {
-    pub entry_files: Vec<EntryId>,
+    pub content: String,
     pub tree: tree_sitter::Tree,
+    pub definitions: HashMap<String, Vec<Definition>>,
 }
 
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct State {
     rx: sync::mpsc::Receiver<Request>,
-    pub entry_files: HashMap<EntryId, EntryData>,
-    pub files: HashMap<path::PathBuf, File>,
+    pub entry_files: HashMap<EntryId, entry::EntryFile>,
+    pub entry_to_files: HashMap<EntryId, HashSet<FileId>>,
+    pub symbol_index: HashMap<String, HashMap<FileId, Vec<Definition>>>,
+    pub files: HashMap<FileId, File>,
     #[derivative(Debug = "ignore")]
     pub parser: tree_sitter::Parser,
     pub root: path::PathBuf,
@@ -98,6 +119,8 @@ impl State {
         State {
             rx,
             entry_files: HashMap::new(),
+            entry_to_files: HashMap::new(),
+            symbol_index: HashMap::new(),
             parser,
             files: HashMap::new(),
             root: path::PathBuf::new(),
@@ -112,88 +135,18 @@ impl State {
                 return;
             }
         };
-        let imports = entry_file.get_all_imports(&mut self.parser).await.unwrap();
+        let mut imports = entry_file.get_all_imports(&mut self.parser).await.unwrap();
+        imports.push(entry_file.entry_point.clone());
         info!("New entry: {:?}, imports: {:?}", id, imports);
 
-        self.import_file(&entry_file, entry_file.entry_point.clone(), &id)
-            .await;
+        self.import_files(imports, &id);
 
-        for import in imports {
-            self.import_file(&entry_file, import, &id).await;
-        }
-
-        let mut ext_defs = entry_file.get_all_ext_definitions().await;
-        match self.entry_files.get_mut(&id) {
-            Some(e) => e.definitions.iter_mut().for_each(|(name, def)| {
-                if let Some(new_def) = ext_defs.remove(name) {
-                    info!("Added ext defs: {:?}", &new_def,);
-                    def.extend(new_def);
-                }
-            }),
-            None => {
-                info!("Added new ext defs: {:?}", &ext_defs,);
-                self.entry_files.insert(
-                    id.clone(),
-                    EntryData {
-                        file: entry_file.clone(),
-                        definitions: ext_defs,
-                    },
-                );
-            }
-        }
-        info!(
-            "Added ext definitions for entry {:?} with {} definitions",
-            id,
-            self.entry_files.get(&id).unwrap().definitions.len()
-        );
-    }
-
-    async fn import_file(
-        &mut self,
-        entry_file: &entry::EntryFile,
-        import: path::PathBuf,
-        id: &EntryId,
-    ) {
-        let content = tokio::fs::read_to_string(&import).await.unwrap();
-        let tree = self.parser.parse(&content, None).unwrap();
-        let mut defs =
-            definitions::Definition::parse_definitions(&tree, &import, content.as_bytes()).unwrap();
-        info!(
-            "Adding definitions for {} in entry {:?} with {} definitions",
-            import.file_name().unwrap().display(),
-            id.0.file_name().unwrap().display(),
-            defs.len()
-        );
-
-        self.files
-            .entry(import)
-            .and_modify(|f| f.entry_files.push(id.clone()))
-            .or_insert(File {
-                entry_files: vec![id.clone()],
-                tree,
-            });
-
-        match self.entry_files.get_mut(id) {
-            Some(e) => e.definitions.iter_mut().for_each(|(name, def)| {
-                if let Some(new_def) = defs.remove(name) {
-                    def.extend(new_def);
-                }
-            }),
-            None => {
-                self.entry_files.insert(
-                    id.clone(),
-                    EntryData {
-                        file: entry_file.clone(),
-                        definitions: defs,
-                    },
-                );
-            }
-        }
+        self.index_files(&id).await;
     }
 
     async fn get_diagnostics(
         &mut self,
-        file: path::PathBuf,
+        file: FileId,
         content: String,
     ) -> Vec<ls_types::Diagnostic> {
         let file = match self.files.get(&file) {
@@ -245,58 +198,42 @@ impl State {
         diagnostics
     }
 
-    async fn update_definitions(&mut self, file: path::PathBuf, content: &[u8]) {
-        if let Some(f) = self.files.get(&file) {
-            let mut defs =
-                definitions::Definition::parse_definitions(&f.tree, &file, content).unwrap();
+    async fn update_definitions(&mut self, file: FileId, content: String) {
+        if let Some(f) = self.files.get_mut(&file) {
+            let mut defs = definitions::Definition::parse_definitions(
+                &f.tree,
+                file.as_ref(),
+                content.as_bytes(),
+            )
+            .unwrap();
 
-            for entry_id in &f.entry_files {
-                if let Some(entry_data) = self.entry_files.get_mut(entry_id) {
-                    for (name, def) in entry_data.definitions.iter_mut() {
-                        def.retain(|d| !d.source.is_file(&file));
-                        if let Some(new_def) = defs.remove(name) {
-                            def.extend(new_def);
-                        }
-                    }
-
-                    // Add new definitions that are present in the file but not in the entry file
-                    for (name, new_def) in defs.iter() {
-                        entry_data
-                            .definitions
-                            .entry(name.clone())
-                            .or_insert_with(Vec::new)
-                            .extend(new_def.clone());
-                    }
-
-                    info!(
-                        "Updated definitions for entry {:?} with total {} definitions",
-                        entry_id,
-                        entry_data.definitions.len()
-                    )
+            info!(
+                "Cleaning up old definitions for file {:?}, removing {} definitions",
+                &file,
+                defs.len()
+            );
+            for symbol in defs.keys() {
+                if let Some(file_defs) = self.symbol_index.get_mut(symbol) {
+                    file_defs.remove(&file);
                 }
             }
+
+            for (name, def) in defs.drain() {
+                self.symbol_index
+                    .entry(name)
+                    .or_default()
+                    .insert(file.clone(), def);
+            }
+
+            f.definitions = defs;
+            f.content = content;
         }
     }
 
-    async fn get_definition(
-        &self,
-        content: &[u8],
-        line: u32,
-        column: u32,
-        file: &File,
-    ) -> Vec<&Definition> {
-        let node = file.tree.root_node().descendant_for_point_range(
-            tree_sitter::Point {
-                row: line as usize,
-                column: column as usize,
-            },
-            tree_sitter::Point {
-                row: line as usize,
-                column: column as usize,
-            },
-        );
+    async fn get_definition(&self, line: u32, column: u32, file: &File) -> Vec<&Definition> {
+        let node = node_at(&file.tree, line, column);
 
-        let node_text = node.as_ref().map(|n| n.utf8_text(content));
+        let node_text = node.as_ref().map(|n| n.utf8_text(file.content.as_bytes()));
         info!(
             "Getting definition for node {:?} at line {}, column {}",
             node_text, line, column
@@ -304,23 +241,19 @@ impl State {
 
         let mut total_defs = vec![];
 
-        if let Some(node) = node {
-            let name = node.utf8_text(content);
-            if let Ok(name) = name {
-                for entry_id in &file.entry_files {
-                    if let Some(entry_data) = self.entry_files.get(entry_id)
-                        && let Some(def) = entry_data.definitions.get(name)
-                    {
-                        total_defs.extend(def);
-                    }
-                }
+        if let Some(node) = node
+            && let Ok(symbol) = node.utf8_text(file.content.as_bytes())
+            && let Some(defs) = self.symbol_index.get(symbol)
+        {
+            for defs in defs.values() {
+                total_defs.extend(defs.iter());
             }
         }
 
         total_defs
     }
 
-    fn update_tree(&mut self, path: &path::PathBuf, content: &str) {
+    fn update_tree(&mut self, path: &FileId, content: &str) {
         let tree = self.parser.parse(content, None).unwrap();
         if let Some(f) = self.files.get_mut(path) {
             info!("Updating tree for file {:?}", path);
@@ -344,7 +277,7 @@ impl State {
                     column,
                     response,
                 } => {
-                    let locations = match self.handle_definition(file, line, column).await {
+                    let locations = match self.handle_definition(file.into(), line, column).await {
                         Ok(l) => l,
                         Err(e) => {
                             warn!("{e}");
@@ -360,7 +293,7 @@ impl State {
                     column,
                     response,
                 } => {
-                    let hover = match self.handle_hover(file, line, column).await {
+                    let hover = match self.handle_hover(file.into(), line, column).await {
                         Ok(h) => h,
                         Err(e) => {
                             warn!("{e}");
@@ -372,7 +305,7 @@ impl State {
                 }
                 Request::UpdateDefinitions { file, content } => {
                     info!("Updating definitions for file {:?}", &file);
-                    self.update_definitions(file, content.as_bytes()).await;
+                    self.update_definitions(file.into(), content).await;
                 }
                 Request::GetDiagnostics {
                     file,
@@ -380,10 +313,11 @@ impl State {
                     update,
                     response,
                 } => {
+                    let file_id = FileId::from(file);
                     if update {
-                        self.update_tree(&file, &content);
+                        self.update_tree(&file_id, &content);
                     }
-                    let diagnostics = self.get_diagnostics(file, content).await;
+                    let diagnostics = self.get_diagnostics(file_id, content).await;
                     let _ = response.send(diagnostics);
                 }
             }
@@ -392,7 +326,7 @@ impl State {
 
     async fn handle_hover(
         &mut self,
-        file: path::PathBuf,
+        file: FileId,
         line: u32,
         column: u32,
     ) -> Result<Option<ls_types::Hover>, String> {
@@ -400,18 +334,19 @@ impl State {
             "Handling hover request for file {:?} at line {}, column {}",
             file, line, column
         );
-        let content = tokio::fs::read_to_string(&file)
-            .await
-            .map_err(|e| e.to_string())?;
         let file = self.files.get(&file).ok_or("File not found")?;
-        let defs = self
-            .get_definition(content.as_bytes(), line, column, file)
-            .await;
+        let defs = self.get_definition(line, column, file).await;
         if defs.is_empty() {
             info!("No definitions found for hover at {}:{}", line, column);
             return Ok(None);
         }
-        let node_under_pos = node_at(&file.tree, line, column);
+        let node_under_pos = match node_at(&file.tree, line, column) {
+            Some(s) => s,
+            None => {
+                info!("No node found at {}:{}", line, column);
+                return Ok(None);
+            }
+        };
         let line = node_under_pos.start_position().row as u32;
         let column = node_under_pos.start_position().column as u32;
         let len = node_under_pos.end_position().column as u32 - column;
@@ -425,12 +360,7 @@ impl State {
                         .unwrap_or_else(|| file.display().to_string()),
                     definitions::SourceInfo::Builtin { name } => name.to_string(),
                     definitions::SourceInfo::Collection { path } => {
-                        let entry_file_path = file
-                            .entry_files
-                            .first()
-                            .map(|id| &id.0)
-                            .unwrap_or(&self.root);
-                        pathdiff::diff_paths(path, entry_file_path)
+                        pathdiff::diff_paths(path, &self.root)
                             .unwrap_or(path.clone())
                             .display()
                             .to_string()
@@ -462,17 +392,12 @@ impl State {
 
     async fn handle_definition(
         &mut self,
-        file: path::PathBuf,
+        file: FileId,
         line: u32,
         column: u32,
     ) -> Result<Vec<ls_types::Location>, String> {
-        let content = tokio::fs::read_to_string(&file)
-            .await
-            .map_err(|e| e.to_string())?;
         let file = self.files.get(&file).ok_or("File not found in state")?;
-        let locations = self
-            .get_definition(content.as_bytes(), line, column, file)
-            .await;
+        let locations = self.get_definition(line, column, file).await;
 
         info!(
             "Found {:?} definitions at line {}, column {}",
@@ -506,19 +431,69 @@ impl State {
 
         Ok(locations)
     }
+
+    fn import_files(&mut self, imports: Vec<path::PathBuf>, id: &EntryId) {
+        for import in imports {
+            self.entry_to_files
+                .entry(id.clone())
+                .or_default()
+                .insert(import.into());
+        }
+    }
+
+    async fn index_files(&mut self, id: &EntryId) {
+        for file in self
+            .entry_to_files
+            .get(id)
+            .unwrap_or(&HashSet::new())
+            .iter()
+        {
+            let content = match tokio::fs::read_to_string(file).await {
+                Ok(c) => c,
+                Err(e) => {
+                    error!("Failed to read file {:?}: {}", file, e);
+                    continue;
+                }
+            };
+            let tree = self.parser.parse(&content, None).unwrap();
+            let defs =
+                definitions::Definition::parse_definitions(&tree, &file.0, content.as_bytes())
+                    .unwrap();
+            info!(
+                "Indexed file {:?} for entry {:?} with {} definitions",
+                &file,
+                id.0.file_name().unwrap().display(),
+                defs.len()
+            );
+
+            self.files
+                .entry(file.clone())
+                .and_modify(|f| f.definitions = defs.clone())
+                .or_insert(File {
+                    content,
+                    tree,
+                    definitions: defs.clone(),
+                });
+
+            for (name, def) in defs {
+                self.symbol_index
+                    .entry(name)
+                    .or_default()
+                    .insert(file.clone(), def);
+            }
+        }
+    }
 }
 
-fn node_at(tree: &tree_sitter::Tree, line: u32, column: u32) -> tree_sitter::Node<'_> {
-    tree.root_node()
-        .descendant_for_point_range(
-            tree_sitter::Point {
-                row: line as usize,
-                column: column as usize,
-            },
-            tree_sitter::Point {
-                row: line as usize,
-                column: column as usize,
-            },
-        )
-        .unwrap()
+fn node_at(tree: &tree_sitter::Tree, line: u32, column: u32) -> Option<tree_sitter::Node<'_>> {
+    tree.root_node().descendant_for_point_range(
+        tree_sitter::Point {
+            row: line as usize,
+            column: column as usize,
+        },
+        tree_sitter::Point {
+            row: line as usize,
+            column: column as usize,
+        },
+    )
 }
