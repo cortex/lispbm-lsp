@@ -91,7 +91,7 @@ pub enum Request {
 #[derive(Debug)]
 pub struct File {
     pub content: String,
-    pub tree: tree_sitter::Tree,
+    pub tree: Option<tree_sitter::Tree>,
     pub definitions: HashMap<String, Vec<Definition>>,
 }
 
@@ -137,6 +137,8 @@ impl State {
         };
         let mut imports = entry_file.get_all_imports(&mut self.parser).await.unwrap();
         imports.push(entry_file.entry_point.clone());
+        let ext_imports = entry_file.get_ext_imports();
+        imports.extend(ext_imports);
         info!("New entry: {:?}, imports: {:?}", id, imports);
 
         self.import_files(imports, &id);
@@ -166,7 +168,7 @@ impl State {
         .unwrap();
 
         let mut cursor = QueryCursor::new();
-        let root = file.tree.root_node();
+        let root = file.tree.as_ref().unwrap().root_node();
         let mut diagnostics = vec![];
         cursor.matches(&q, root, content.as_bytes()).for_each(|m| {
             for cap in m.captures {
@@ -200,8 +202,10 @@ impl State {
 
     async fn update_definitions(&mut self, file: FileId, content: String) {
         if let Some(f) = self.files.get_mut(&file) {
+            // TODO: add check for toml file update
+
             let mut defs = definitions::Definition::parse_definitions(
-                &f.tree,
+                f.tree.as_ref().unwrap(),
                 file.as_ref(),
                 content.as_bytes(),
             )
@@ -231,7 +235,7 @@ impl State {
     }
 
     async fn get_definition(&self, line: u32, column: u32, file: &File) -> Vec<&Definition> {
-        let node = node_at(&file.tree, line, column);
+        let node = node_at(file.tree.as_ref(), line, column);
 
         let node_text = node.as_ref().map(|n| n.utf8_text(file.content.as_bytes()));
         info!(
@@ -257,7 +261,7 @@ impl State {
         let tree = self.parser.parse(content, None).unwrap();
         if let Some(f) = self.files.get_mut(path) {
             info!("Updating tree for file {:?}", path);
-            f.tree = tree;
+            f.tree = Some(tree);
         }
     }
 
@@ -340,7 +344,7 @@ impl State {
             info!("No definitions found for hover at {}:{}", line, column);
             return Ok(None);
         }
-        let node_under_pos = match node_at(&file.tree, line, column) {
+        let node_under_pos = match node_at(file.tree.as_ref(), line, column) {
             Some(s) => s,
             None => {
                 info!("No node found at {}:{}", line, column);
@@ -455,25 +459,95 @@ impl State {
                     continue;
                 }
             };
-            let tree = self.parser.parse(&content, None).unwrap();
-            let defs =
-                definitions::Definition::parse_definitions(&tree, &file.0, content.as_bytes())
-                    .unwrap();
-            info!(
-                "Indexed file {:?} for entry {:?} with {} definitions",
-                &file,
-                id.0.file_name().unwrap().display(),
-                defs.len()
-            );
 
-            self.files
-                .entry(file.clone())
-                .and_modify(|f| f.definitions = defs.clone())
-                .or_insert(File {
-                    content,
-                    tree,
-                    definitions: defs.clone(),
-                });
+            let ext = file
+                .as_ref()
+                .extension()
+                .and_then(|s| s.to_str())
+                .unwrap_or("");
+            let defs = match ext {
+                "lisp" | "lsp" => {
+                    let tree = self.parser.parse(&content, None).unwrap();
+                    let defs = definitions::Definition::parse_definitions(
+                        &tree,
+                        &file.0,
+                        content.as_bytes(),
+                    )
+                    .unwrap();
+                    info!(
+                        "Indexed file {:?} for entry {:?} with {} definitions",
+                        &file,
+                        id.0.file_name().unwrap().display(),
+                        defs.len()
+                    );
+
+                    self.files
+                        .entry(file.clone())
+                        .and_modify(|f| f.definitions = defs.clone())
+                        .or_insert(File {
+                            content,
+                            tree: Some(tree),
+                            definitions: defs.clone(),
+                        });
+
+                    defs
+                }
+                "toml" => {
+                    let filename = file.as_ref().file_name().and_then(|s| s.to_str());
+                    match filename {
+                        Some("entry.toml") => {
+                            let entry = match entry::EntryFile::load_from_file(file.as_ref()).await
+                            {
+                                Ok(s) => s,
+                                Err(e) => {
+                                    error!("Error loading entry {:?}: {}", id.0, e);
+                                    continue;
+                                }
+                            };
+                            let ext_imports = entry.get_ext_inline_definitions();
+                            self.files
+                                .entry(file.clone())
+                                .and_modify(|f| f.definitions = ext_imports.clone())
+                                .or_insert(File {
+                                    content,
+                                    tree: None,
+                                    definitions: ext_imports.clone(),
+                                });
+                            self.entry_files.insert(id.clone(), entry);
+
+                            ext_imports
+                        }
+                        _ => {
+                            let def_file: entry::DefinitionFile = match toml::from_str(&content) {
+                                Ok(d) => d,
+                                Err(e) => {
+                                    error!(
+                                        "Failed to parse definition collection file {:?}: {}",
+                                        file, e
+                                    );
+                                    continue;
+                                }
+                            };
+                            let defs = def_file.get_definitions(file.as_ref());
+
+                            self.files
+                                .entry(file.clone())
+                                .and_modify(|f| f.definitions = defs.clone())
+                                .or_insert(File {
+                                    content,
+                                    tree: None,
+                                    definitions: defs.clone(),
+                                });
+
+                            defs
+                        }
+                    }
+                }
+                _ => {
+                    warn!("Unsupported file extension {:?} for file {:?}", ext, file);
+                    return;
+                }
+            };
 
             for (name, def) in defs {
                 self.symbol_index
@@ -485,15 +559,23 @@ impl State {
     }
 }
 
-fn node_at(tree: &tree_sitter::Tree, line: u32, column: u32) -> Option<tree_sitter::Node<'_>> {
-    tree.root_node().descendant_for_point_range(
-        tree_sitter::Point {
-            row: line as usize,
-            column: column as usize,
-        },
-        tree_sitter::Point {
-            row: line as usize,
-            column: column as usize,
-        },
-    )
+fn node_at(
+    tree: Option<&tree_sitter::Tree>,
+    line: u32,
+    column: u32,
+) -> Option<tree_sitter::Node<'_>> {
+    if let Some(tree) = tree {
+        tree.root_node().descendant_for_point_range(
+            tree_sitter::Point {
+                row: line as usize,
+                column: column as usize,
+            },
+            tree_sitter::Point {
+                row: line as usize,
+                column: column as usize,
+            },
+        )
+    } else {
+        None
+    }
 }
