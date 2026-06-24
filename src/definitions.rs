@@ -3,13 +3,59 @@ use std::{collections::HashMap, path};
 use serde::{Deserialize, Serialize};
 use tree_sitter::{QueryCursor, StreamingIterator};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+use crate::entry;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Definition {
-    pub file: path::PathBuf,
     pub comment: Option<String>,
-    pub line: u32,
-    pub column: u32,
-    pub len: u32,
+    pub source: SourceInfo,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SourceInfo {
+    Source {
+        file: path::PathBuf,
+        line: u32,
+        column: u32,
+        len: u32,
+    },
+    Builtin {
+        name: entry::Builtin,
+    },
+    Collection {
+        path: path::PathBuf,
+    },
+}
+
+impl SourceInfo {
+    pub fn id(&self) -> String {
+        match self {
+            SourceInfo::Source { file, .. } => file.display().to_string(),
+            SourceInfo::Builtin { name } => name.to_string(),
+            SourceInfo::Collection { path } => path.display().to_string(),
+        }
+    }
+
+    pub fn is_file(&self, file: &path::PathBuf) -> bool {
+        match self {
+            SourceInfo::Source { file: f, .. } => f == file,
+            _ => false,
+        }
+    }
+
+    pub fn is_builtin(&self, name: &entry::Builtin) -> bool {
+        match self {
+            SourceInfo::Builtin { name: n } => n == name,
+            _ => false,
+        }
+    }
+
+    pub fn is_collection(&self, path: &path::PathBuf) -> bool {
+        match self {
+            SourceInfo::Collection { path: p } => p == path,
+            _ => false,
+        }
+    }
 }
 
 impl Definition {
@@ -87,18 +133,19 @@ impl Definition {
         let mut current_line = node_start_line;
         for comment_node in all_nodes_above_definition {
             if comment_node.start_position().row as u32 == current_line - 1 {
-                let c = comment_node
+                let mut c = comment_node
                     .utf8_text(content)
                     .map_err(|e| e.to_string())?
                     .trim_start_matches(';')
                     .trim()
                     .to_string();
-                if !c.is_empty() {
-                    if let Some(existing) = comment {
-                        comment = Some(format!("{} {}", c, existing));
-                    } else {
-                        comment = Some(c);
-                    }
+                if c.is_empty() {
+                    c = String::from("\n\n");
+                };
+                if let Some(existing) = comment {
+                    comment = Some(format!("{} {}", c, existing));
+                } else {
+                    comment = Some(c);
                 }
                 current_line -= 1;
             } else {
@@ -120,12 +167,7 @@ impl Definition {
                 .to_string();
             if !c.is_empty() {
                 if let Some(existing) = comment {
-                    // if the comment is on the same line as the definition, only use the comment after the definition
-                    if comment_node.start_position().row as u32 == line {
-                        comment = Some(c);
-                    } else {
-                        comment = Some(format!("{} {}", existing, c));
-                    }
+                    comment = Some(format!("{}\n\n{}", existing, c));
                 } else {
                     comment = Some(c);
                 }
@@ -135,11 +177,13 @@ impl Definition {
         Ok((
             name,
             Self {
-                file,
                 comment,
-                line,
-                column,
-                len,
+                source: SourceInfo::Source {
+                    file,
+                    line,
+                    column,
+                    len,
+                },
             },
         ))
     }

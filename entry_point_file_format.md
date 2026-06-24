@@ -28,7 +28,7 @@ path = "../../helpers.toml"
 builtin = "core"
 
 [[extension]]
-definition = [
+definitions = [
     "hello"
 ]
 
