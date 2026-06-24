@@ -1,7 +1,10 @@
-use std::path;
+use std::{collections::HashMap, path};
 
 use serde::{Deserialize, Serialize};
+use tracing::{error, info};
 use tree_sitter::{QueryCursor, StreamingIterator};
+
+use crate::definitions::{self, SourceInfo};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EntryFile {
@@ -12,16 +15,53 @@ pub struct EntryFile {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Extension {
-    Path(path::PathBuf),
-    Builtin(String),
-    Definition(Vec<String>),
+    #[serde(rename = "path")]
+    Collection(path::PathBuf),
+    Builtin(Builtin),
+    #[serde(rename = "definitions")]
+    Inline(Vec<Definition>),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[serde(untagged)]
+pub enum Definition {
+    Full {
+        name: String,
+        comment: Option<String>,
+    },
+    Inline(String),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct DefinitionFile {
+    pub definitions: Vec<Definition>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Builtin {
+    Core,
+    Std,
+}
+
+impl std::fmt::Display for Builtin {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Builtin::Core => write!(f, "core"),
+            Builtin::Std => write!(f, "std"),
+        }
+    }
 }
 
 impl EntryFile {
     pub async fn load_from_file(path: &path::Path) -> Result<Self, std::io::Error> {
         let content = tokio::fs::read_to_string(path).await?;
-        let mut entry_file: EntryFile =
-            toml::from_str(&content).map_err(|_| std::io::ErrorKind::InvalidInput)?;
+        let mut entry_file: EntryFile = toml::from_str(&content).map_err(|e| {
+            error!("Failed to parse entry file: {}", e);
+            std::io::ErrorKind::InvalidInput
+        })?;
         entry_file.entry_point = path
             .parent()
             .unwrap()
@@ -61,6 +101,82 @@ impl EntryFile {
 
         Some(paths)
     }
+
+    pub async fn get_all_ext_definitions(&self) -> HashMap<String, Vec<definitions::Definition>> {
+        let mut defs = HashMap::<String, Vec<definitions::Definition>>::new();
+        for ext in &self.extension {
+            match ext {
+                Extension::Collection(path_buf) => {
+                    let path = self
+                        .entry_point
+                        .parent()
+                        .unwrap()
+                        .join(path_buf)
+                        .canonicalize()
+                        .unwrap();
+                    let content = match tokio::fs::read_to_string(&path).await {
+                        Ok(c) => c,
+                        Err(e) => {
+                            error!(
+                                "Failed to read definition collection file {:?}: {}",
+                                path_buf, e
+                            );
+                            continue;
+                        }
+                    };
+                    let def_file: DefinitionFile = toml::from_str(&content).unwrap();
+                    info!("Loaded definitions from collection: {:?}", path_buf);
+                    for def in def_file.definitions {
+                        let (name, comment) = match def {
+                            Definition::Full { name, comment } => (name, comment),
+                            Definition::Inline(name) => (name, None),
+                        };
+                        let defs = defs.entry(name).or_default();
+                        defs.push(definitions::Definition {
+                            comment,
+                            source: SourceInfo::Collection { path: path.clone() },
+                        });
+                    }
+                }
+                Extension::Builtin(builtin) => {
+                    let definitions: Vec<Definition> = match builtin {
+                        Builtin::Core => vec![],
+                        Builtin::Std => vec![],
+                    };
+                    for def in definitions {
+                        let (name, comment) = match def {
+                            Definition::Full { name, comment } => (name, comment),
+                            Definition::Inline(name) => (name, None),
+                        };
+                        let defs = defs.entry(name).or_default();
+                        defs.push(definitions::Definition {
+                            comment,
+                            source: SourceInfo::Builtin {
+                                name: builtin.clone(),
+                            },
+                        });
+                    }
+                }
+                Extension::Inline(definitions) => {
+                    for def in definitions {
+                        let (name, comment) = match def {
+                            Definition::Full { name, comment } => (name, comment),
+                            Definition::Inline(name) => (name, &None),
+                        };
+                        let defs = defs.entry(name.clone()).or_default();
+                        defs.push(definitions::Definition {
+                            comment: comment.clone(),
+                            source: SourceInfo::Collection {
+                                path: self.entry_point.clone(),
+                            },
+                        });
+                    }
+                }
+            }
+        }
+
+        defs
+    }
 }
 
 mod tests {
@@ -78,16 +194,35 @@ mod tests {
             builtin = "core"
 
             [[extension]]
-            definition = [
-                "hello"
+            definitions = [
+                {
+                    name = "hello",
+                    comment = """
+                    A simple greeting function
+                    """
+                },
+                {
+                    name = "hello2",
+                },
+                "hello3"
             ]
         "#;
         let entry = EntryFile {
             entry_point: path::PathBuf::from("./main.lisp"),
             extension: vec![
-                Extension::Path(path::PathBuf::from("../../helpers.toml")),
-                Extension::Builtin("core".to_string()),
-                Extension::Definition(vec!["foo".to_string(), "bar".to_string()]),
+                Extension::Collection(path::PathBuf::from("../../helpers.toml")),
+                Extension::Builtin(Builtin::Core),
+                Extension::Inline(vec![
+                    Definition::Full {
+                        name: "hello".to_string(),
+                        comment: Some("A simple greeting function".to_string()),
+                    },
+                    Definition::Full {
+                        name: "hello2".to_string(),
+                        comment: None,
+                    },
+                    Definition::Inline("hello3".to_string()),
+                ]),
             ],
         };
 

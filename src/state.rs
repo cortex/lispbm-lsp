@@ -3,7 +3,7 @@ use std::{collections::HashMap, path, str, vec};
 use derivative::Derivative;
 use tokio::sync;
 use tower_lsp_server::ls_types::{self, DiagnosticSeverity};
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 use tree_sitter::{QueryCursor, StreamingIterator};
 
 use crate::{
@@ -105,7 +105,13 @@ impl State {
     }
 
     async fn new_entry(&mut self, id: EntryId) {
-        let entry_file = entry::EntryFile::load_from_file(&id.0).await.unwrap();
+        let entry_file = match entry::EntryFile::load_from_file(&id.0).await {
+            Ok(s) => s,
+            Err(e) => {
+                error!("Error loading entry {:?}: {}", id.0, e);
+                return;
+            }
+        };
         let imports = entry_file.get_all_imports(&mut self.parser).await.unwrap();
         info!("New entry: {:?}, imports: {:?}", id, imports);
 
@@ -115,6 +121,31 @@ impl State {
         for import in imports {
             self.import_file(&entry_file, import, &id).await;
         }
+
+        let mut ext_defs = entry_file.get_all_ext_definitions().await;
+        match self.entry_files.get_mut(&id) {
+            Some(e) => e.definitions.iter_mut().for_each(|(name, def)| {
+                if let Some(new_def) = ext_defs.remove(name) {
+                    info!("Added ext defs: {:?}", &new_def,);
+                    def.extend(new_def);
+                }
+            }),
+            None => {
+                info!("Added new ext defs: {:?}", &ext_defs,);
+                self.entry_files.insert(
+                    id.clone(),
+                    EntryData {
+                        file: entry_file.clone(),
+                        definitions: ext_defs,
+                    },
+                );
+            }
+        }
+        info!(
+            "Added ext definitions for entry {:?} with {} definitions",
+            id,
+            self.entry_files.get(&id).unwrap().definitions.len()
+        );
     }
 
     async fn import_file(
@@ -222,7 +253,7 @@ impl State {
             for entry_id in &f.entry_files {
                 if let Some(entry_data) = self.entry_files.get_mut(entry_id) {
                     for (name, def) in entry_data.definitions.iter_mut() {
-                        def.retain(|d| d.file != file);
+                        def.retain(|d| !d.source.is_file(&file));
                         if let Some(new_def) = defs.remove(name) {
                             def.extend(new_def);
                         }
@@ -387,20 +418,28 @@ impl State {
         let hover_text = defs
             .iter()
             .filter_map(|def| {
-                info!(
-                    "Hover text for definition {} at {}:{} is: {:?}",
-                    def.file.display(),
-                    def.line,
-                    def.column,
-                    def.comment
-                );
-                def.comment.as_ref().map(|comment| {
-                    format!(
-                        "{}\n\n__{}__",
-                        comment,
-                        def.file.file_name().unwrap().display(),
-                    )
-                })
+                let filename = match &def.source {
+                    definitions::SourceInfo::Source { file, .. } => file
+                        .file_name()
+                        .map(|s| s.to_string_lossy().to_string())
+                        .unwrap_or_else(|| file.display().to_string()),
+                    definitions::SourceInfo::Builtin { name } => name.to_string(),
+                    definitions::SourceInfo::Collection { path } => {
+                        let entry_file_path = file
+                            .entry_files
+                            .first()
+                            .map(|id| &id.0)
+                            .unwrap_or(&self.root);
+                        pathdiff::diff_paths(path, entry_file_path)
+                            .unwrap_or(path.clone())
+                            .display()
+                            .to_string()
+                    }
+                };
+
+                def.comment
+                    .as_ref()
+                    .map(|comment| format!("{}\n\n__{}__", comment, filename))
             })
             .collect::<Vec<_>>()
             .join("\n\n---\n\n");
@@ -442,18 +481,26 @@ impl State {
 
         let locations = locations
             .iter()
-            .map(|d| ls_types::Location {
-                uri: ls_types::Uri::from_file_path(&d.file).unwrap(),
-                range: ls_types::Range {
-                    start: ls_types::Position {
-                        line: d.line,
-                        character: d.column,
+            .filter_map(|d| match &d.source {
+                definitions::SourceInfo::Source {
+                    file,
+                    line,
+                    column,
+                    len,
+                } => Some(ls_types::Location {
+                    uri: ls_types::Uri::from_file_path(file).unwrap(),
+                    range: ls_types::Range {
+                        start: ls_types::Position {
+                            line: *line,
+                            character: *column,
+                        },
+                        end: ls_types::Position {
+                            line: *line,
+                            character: column + len,
+                        },
                     },
-                    end: ls_types::Position {
-                        line: d.line,
-                        character: d.column + d.len,
-                    },
-                },
+                }),
+                _ => None,
             })
             .collect::<Vec<_>>();
 
