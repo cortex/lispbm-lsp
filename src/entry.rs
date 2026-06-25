@@ -94,6 +94,11 @@ impl EntryFile {
             .join(entry_file.entry_point)
             .canonicalize()?;
 
+        info!(
+            "[Entry] Loaded: {:?}, Extensions: {:?}",
+            path, entry_file.extension
+        );
+
         Ok(entry_file)
     }
 
@@ -128,7 +133,7 @@ impl EntryFile {
         Some(paths)
     }
 
-    pub fn get_ext_imports(&self) -> Vec<path::PathBuf> {
+    pub fn get_ext_imports(&self) -> Result<Vec<path::PathBuf>, std::io::Error> {
         let mut paths = vec![];
         for ext in &self.extension {
             match ext {
@@ -136,10 +141,10 @@ impl EntryFile {
                     let path = self
                         .entry_point
                         .parent()
-                        .unwrap()
+                        .ok_or(std::io::ErrorKind::IsADirectory)?
                         .join(path_buf)
-                        .canonicalize()
-                        .unwrap();
+                        .canonicalize()?;
+                    info!("[Entry] Loaded extension collection: {:?}", path);
                     paths.push(path);
                 }
                 Extension::Inline(_) => {
@@ -150,7 +155,7 @@ impl EntryFile {
             }
         }
 
-        paths
+        Ok(paths)
     }
 
     pub fn get_ext_builtins(&self) -> Vec<Builtin> {
@@ -180,6 +185,7 @@ impl EntryFile {
                     Definition::Full { name, comment } => (name.clone(), comment.clone()),
                     Definition::Inline(name) => (name.clone(), None),
                 };
+                info!("[Enrty] Loaded inline definition: {}", name);
                 (
                     name,
                     vec![definitions::Definition {
