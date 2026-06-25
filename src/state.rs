@@ -116,6 +116,8 @@ impl State {
             .set_language(&language.into())
             .expect("Error loading lispBM grammar");
 
+        info!("[State] Initialized with lispBM grammar");
+
         State {
             rx,
             entry_files: HashMap::new(),
@@ -131,15 +133,25 @@ impl State {
         let entry_file = match entry::EntryFile::load_from_file(&id.0).await {
             Ok(s) => s,
             Err(e) => {
-                error!("Error loading entry {:?}: {}", id.0, e);
+                error!("[Entry] Error loading {:?}: {}", id.0, e);
                 return;
             }
         };
         let mut imports = entry_file.get_all_imports(&mut self.parser).await.unwrap();
         imports.push(entry_file.entry_point.clone());
-        let ext_imports = entry_file.get_ext_imports();
+        let ext_imports = match entry_file.get_ext_imports() {
+            Ok(i) => i,
+            Err(e) => {
+                error!(
+                    "[Entry] Error getting external imports for {:?}: {}",
+                    id.0, e
+                );
+                vec![]
+            }
+        };
         imports.extend(ext_imports);
-        info!("New entry: {:?}, imports: {:?}", id, imports);
+        imports.push(id.0.clone());
+        info!("[Entry] New entry: {:?}, imports: {:?}", id, imports);
 
         self.import_files(imports, &id);
 
@@ -202,19 +214,68 @@ impl State {
 
     async fn update_definitions(&mut self, file: FileId, content: String) {
         if let Some(f) = self.files.get_mut(&file) {
-            // TODO: add check for toml file update
+            let ext = file
+                .as_ref()
+                .extension()
+                .and_then(|s| s.to_str())
+                .unwrap_or("");
+            let mut defs = match ext {
+                "lisp" | "lsp" => definitions::Definition::parse_definitions(
+                    f.tree.as_ref().unwrap(),
+                    file.as_ref(),
+                    content.as_bytes(),
+                )
+                .unwrap(),
+                "toml" => {
+                    let filename = file.as_ref().file_name().and_then(|s| s.to_str());
+                    match filename {
+                        Some("entry.toml") => {
+                            let entry = match entry::EntryFile::load_from_file(file.as_ref()).await
+                            {
+                                Ok(s) => s,
+                                Err(e) => {
+                                    error!("Error loading entry {:?}: {}", file.0, e);
+                                    return;
+                                }
+                            };
 
-            let mut defs = definitions::Definition::parse_definitions(
-                f.tree.as_ref().unwrap(),
-                file.as_ref(),
-                content.as_bytes(),
-            )
-            .unwrap();
+                            let ext_imports = entry.get_ext_inline_definitions();
+
+                            info!(
+                                "[Definition] Updated entry file {:?} with {} definitions",
+                                file,
+                                ext_imports.len()
+                            );
+
+                            self.entry_files.insert(EntryId(file.0.clone()), entry);
+
+                            ext_imports
+                        }
+                        _ => {
+                            let def_file: entry::DefinitionFile = match toml::from_str(&content) {
+                                Ok(d) => d,
+                                Err(e) => {
+                                    error!(
+                                        "Failed to parse definition collection file {:?}: {}",
+                                        file, e
+                                    );
+                                    return;
+                                }
+                            };
+                            def_file.get_definitions(file.as_ref())
+                        }
+                    }
+                }
+                _ => {
+                    warn!("Unsupported file extension {:?} for file {:?}", ext, file);
+                    return;
+                }
+            };
 
             info!(
-                "Cleaning up old definitions for file {:?}, removing {} definitions",
+                "[Definition] Cleaning old definitions, {} definitions removed, file: {:?}",
+                defs.len(),
                 &file,
-                defs.len()
             );
             for symbol in defs.keys() {
                 if let Some(file_defs) = self.symbol_index.get_mut(symbol) {
@@ -222,6 +283,11 @@ impl State {
                 }
             }
 
+            info!(
+                "[Definition] Updated definitions, {} definitions added, file: {:?}",
+                defs.len(),
+                &file,
+            );
             for (name, def) in defs.drain() {
                 self.symbol_index
                     .entry(name)
@@ -239,7 +305,7 @@ impl State {
 
         let node_text = node.as_ref().map(|n| n.utf8_text(file.content.as_bytes()));
         info!(
-            "Getting definition for node {:?} at line {}, column {}",
+            "[Definition] Getting {:?} at {}:{}",
             node_text, line, column
         );
 
@@ -260,7 +326,7 @@ impl State {
     fn update_tree(&mut self, path: &FileId, content: &str) {
         let tree = self.parser.parse(content, None).unwrap();
         if let Some(f) = self.files.get_mut(path) {
-            info!("Updating tree for file {:?}", path);
+            info!("[Tree] Updating file {:?}", path);
             f.tree = Some(tree);
         }
     }
@@ -270,7 +336,7 @@ impl State {
             match request {
                 Request::SetRoot { path } => {
                     self.root = path;
-                    info!("Set root path to {:?}", self.root);
+                    info!("[Root] Set path {:?}", self.root);
                 }
                 Request::NewEntry { id } => {
                     self.new_entry(id).await;
@@ -284,7 +350,7 @@ impl State {
                     let locations = match self.handle_definition(file.into(), line, column).await {
                         Ok(l) => l,
                         Err(e) => {
-                            warn!("{e}");
+                            warn!("[Definition] {e}");
                             let _ = response.send(vec![]);
                             continue;
                         }
@@ -308,7 +374,7 @@ impl State {
                     let _ = response.send(hover);
                 }
                 Request::UpdateDefinitions { file, content } => {
-                    info!("Updating definitions for file {:?}", &file);
+                    info!("[Definition] Updating file {:?}", &file);
                     self.update_definitions(file.into(), content).await;
                 }
                 Request::GetDiagnostics {
@@ -317,6 +383,14 @@ impl State {
                     update,
                     response,
                 } => {
+                    if self.root.as_path() == path::Path::new("") {
+                        warn!(
+                            "[Diagnostics] Root path not set, skipping diagnostics for {:?}",
+                            &file
+                        );
+                        let _ = response.send(vec![]);
+                        continue;
+                    }
                     let file_id = FileId::from(file);
                     if update {
                         self.update_tree(&file_id, &content);
@@ -334,20 +408,17 @@ impl State {
         line: u32,
         column: u32,
     ) -> Result<Option<ls_types::Hover>, String> {
-        info!(
-            "Handling hover request for file {:?} at line {}, column {}",
-            file, line, column
-        );
+        info!("[Hover] Request for {:?} at {}:{}", file, line, column);
         let file = self.files.get(&file).ok_or("File not found")?;
         let defs = self.get_definition(line, column, file).await;
         if defs.is_empty() {
-            info!("No definitions found for hover at {}:{}", line, column);
+            info!("[Hover] No definitions found at {}:{}", line, column);
             return Ok(None);
         }
         let node_under_pos = match node_at(file.tree.as_ref(), line, column) {
             Some(s) => s,
             None => {
-                info!("No node found at {}:{}", line, column);
+                info!("[Hover] No node found at {}:{}", line, column);
                 return Ok(None);
             }
         };
@@ -356,7 +427,7 @@ impl State {
         let len = node_under_pos.end_position().column as u32 - column;
         let hover_text = defs
             .iter()
-            .filter_map(|def| {
+            .map(|def| {
                 let filename = match &def.source {
                     definitions::SourceInfo::Source { file, .. } => file
                         .file_name()
@@ -371,15 +442,23 @@ impl State {
                     }
                 };
 
-                def.comment
+                match def
+                    .comment
                     .as_ref()
                     .map(|comment| format!("{}\n\n__{}__", comment, filename))
+                {
+                    Some(s) => s,
+                    None => format!("\n\n__{}__", filename),
+                }
             })
             .collect::<Vec<_>>()
             .join("\n\n---\n\n");
-        info!("Hover text for {}:{} is: {:?}", line, column, hover_text);
+        info!("[Hover] at: {}:{} text: {:?}", line, column, hover_text);
         let hover = ls_types::Hover {
-            contents: ls_types::HoverContents::Scalar(ls_types::MarkedString::String(hover_text)),
+            contents: ls_types::HoverContents::Markup(ls_types::MarkupContent {
+                kind: ls_types::MarkupKind::Markdown,
+                value: hover_text,
+            }),
             range: Some(ls_types::Range {
                 start: ls_types::Position {
                     line,
@@ -404,7 +483,7 @@ impl State {
         let locations = self.get_definition(line, column, file).await;
 
         info!(
-            "Found {:?} definitions at line {}, column {}",
+            "[Definition] Found {:?} line {}, column {}",
             locations, line, column
         );
 
@@ -465,6 +544,7 @@ impl State {
                 .extension()
                 .and_then(|s| s.to_str())
                 .unwrap_or("");
+            info!("[Indexing] file: {:?} type: {}", &file, &ext);
             let defs = match ext {
                 "lisp" | "lsp" => {
                     let tree = self.parser.parse(&content, None).unwrap();
