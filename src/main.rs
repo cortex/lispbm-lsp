@@ -1,3 +1,4 @@
+mod builtin;
 mod definitions;
 mod entry;
 mod logger;

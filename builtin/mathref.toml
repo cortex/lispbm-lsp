@@ -1,0 +1,116 @@
+definitions = [
+    {
+        name = "sin",
+        comment = """
+Computes the sine of a given angle (in radians). The form of a sin expression is (sin expr) . 
+"""
+    },
+    {
+        name = "cos",
+        comment = """
+Computes the cosine of a given angle (in radians). The form of a cos expression is (cos expr) . 
+"""
+    },
+    {
+        name = "tan",
+        comment = """
+Computes the tangent of a given angle (in radians). The form of a tan expression is (tan expr) . 
+"""
+    },
+    {
+        name = "asin",
+        comment = """
+Computes the arcsine of a value, returning an angle in radians. The form of an asin expression is (asin expr) . The argument should be in the range [-1, 1]. 
+"""
+    },
+    {
+        name = "acos",
+        comment = """
+Computes the arccosine of a value, returning an angle in radians. The form of an acos expression is (acos expr) . The argument should be in the range [-1, 1]. 
+"""
+    },
+    {
+        name = "atan",
+        comment = """
+Computes the arctangent of a value, returning an angle in radians. The form of an atan expression is (atan expr) . 
+"""
+    },
+    {
+        name = "atan2",
+        comment = """
+Computes the arctangent of y/x , using the signs of both arguments to determine the correct quadrant. Returns an angle in radians in the range [-pi, pi]. The form of an atan2 expression is (atan2 y x) . 
+"""
+    },
+    {
+        name = "pow",
+        comment = """
+Raises a base to a given exponent. The form of a pow expression is (pow base exponent) . 
+"""
+    },
+    {
+        name = "exp",
+        comment = """
+Computes the exponential function e raised to the power of the argument. The form of an exp expression is (exp expr) . 
+"""
+    },
+    {
+        name = "sqrt",
+        comment = """
+Computes the square root of a number. The form of a sqrt expression is (sqrt expr) . 
+"""
+    },
+    {
+        name = "log",
+        comment = """
+Computes the natural logarithm (base e) of a number. The form of a log expression is (log expr) . 
+"""
+    },
+    {
+        name = "log10",
+        comment = """
+Computes the base-10 logarithm of a number. The form of a log10 expression is (log10 expr) . 
+"""
+    },
+    {
+        name = "floor",
+        comment = """
+Rounds a number down to the nearest integer, returning a float. The form of a floor expression is (floor expr) . 
+"""
+    },
+    {
+        name = "ceil",
+        comment = """
+Rounds a number up to the nearest integer, returning a float. The form of a ceil expression is (ceil expr) . 
+"""
+    },
+    {
+        name = "round",
+        comment = """
+Rounds a number to the nearest integer, returning a float. Halfway cases are rounded away from zero. The form of a round expression is (round expr) . 
+"""
+    },
+    {
+        name = "deg2rad",
+        comment = """
+Converts degrees to radians. When called with a single argument the form is (deg2rad expr) . When called with multiple arguments, each is converted and the results are returned as a list. 
+"""
+    },
+    {
+        name = "rad2deg",
+        comment = """
+Converts radians to degrees. When called with a single argument the form is (rad2deg expr) . When called with multiple arguments, each is converted and the results are returned as a list. 
+"""
+    },
+    {
+        name = "is-nan",
+        comment = """
+is-nan checks whether a floating-point value is NaN (not a number). Returns t if the value is NaN and nil otherwise. The form of an is-nan expression is (is-nan expr) . Only float and double values can be NaN; any other number type returns nil . NaN can arise from operations such as (sqrt -1.0) or (asin 2.0) . Note that division by zero is an error in LispBM and does not produce NaN. 
+"""
+    },
+    {
+        name = "is-inf",
+        comment = """
+is-inf checks whether a floating-point value is infinite. Returns t if the value is positive or negative infinity, nil otherwise. The form of an is-inf expression is (is-inf expr) . Only float and double values can be infinite; any other number type returns nil . Infinity can arise from operations such as (exp 1000.0) or (log 0.0) . Note that division by zero is an error in LispBM and does not produce infinity. 
+"""
+    }
+]

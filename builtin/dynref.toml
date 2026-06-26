@@ -1,0 +1,128 @@
+definitions = [
+    {
+        name = "abs",
+        comment = """
+Compute the absolute value 
+"""
+    },
+    {
+        name = "filter",
+        comment = """
+Filter a list from unwanted elements as decided by a predicate 
+"""
+    },
+    {
+        name = "foldl",
+        comment = """
+foldl walks through a list, left to right, while accumulating a result from applying a function to the element at hand and the result of its previous step. foldl takes an initial value used as the that is combined with the leftmost value of the list in the first iteration. 
+"""
+    },
+    {
+        name = "foldr",
+        comment = """
+foldr walks through a list, right to left, while combining value and prev result step by step. An initial value is provided and here used in the first, rightmost, operation. foldr has a disadvantage compared to foldl as I don't think it is possible to give foldr a constant-space and tail-recursive implementation. One can make foldr tail-recursive by writing it in continuation passing style (CPS). The CPS version of foldr will run without building upon the return stack, but instead it will construct and expand upon a continuation object each iteration. This continuation object will grow at the same rate as the call-stack otherwise would but it would grow in heap usage. 
+"""
+    },
+    {
+        name = "iota",
+        comment = """
+iota takes one number as argument and generates a list of values up to (not including) the given number. 
+"""
+    },
+    {
+        name = "second",
+        comment = """
+second extracts the second element from a list. 
+"""
+    },
+    {
+        name = "str-cmp-asc",
+        comment = """
+compare strings according to alphabetical order ascending. 
+"""
+    },
+    {
+        name = "str-cmp-dsc",
+        comment = """
+compare strings according to alphabetical order descending. 
+"""
+    },
+    {
+        name = "str-merge",
+        comment = """
+str-merge is an alternative name for the str-join operations. It is kept around for backwards compatibility. 
+"""
+    },
+    {
+        name = "third",
+        comment = """
+third extracts the third element from a list. 
+"""
+    },
+    {
+        name = "defun",
+        comment = """
+defun is a macro that provides a shorthand form for defining a named function. (defun name args body) is expanded into (define name (lambda args body)) . 
+"""
+    },
+    {
+        name = "defunret",
+        comment = """
+defunret is like defun but you are allowed to return at any point in the function body. 
+"""
+    },
+    {
+        name = "defmacro",
+        comment = """
+defmacro is a macro that provides a shorthand form for defining macros. (defmacro name args body) expands into (define name (macro args body)) . 
+"""
+    },
+    {
+        name = "loopfor",
+        comment = """
+loopfor has the form (loopfor it start cond update body) and implements a for loop as familiar from for example C. it is the iterator, start is what it is initialized to, cond is the condition that has the be true for the loop to continue running, update is how to update the iterator after each iteration and body is the code to execute each iteration. The iterator can be accessed from within body. 
+"""
+    },
+    {
+        name = "loopwhile",
+        comment = """
+loopwhile has the form (loopwhile cond body) and implements a while loop as familiar from for example C. cond is the condition that has the be true for the loop to continue running and body is the code to execute each iteration. 
+"""
+    },
+    {
+        name = "looprange",
+        comment = """
+looprange has the form (looprange it start end body) and implements a loop over a range similar to python's for i in range(n) . Iterate it from start to end and evaluate body for each iteration. The iterator it can be accessed from within body. 
+"""
+    },
+    {
+        name = "loopforeach",
+        comment = """
+loopforeach has the form (loopforeach it lst body) and implements a loop over the elements of a list similar to python's for e in ... . Iterate over every element in the list lst and evaluate body for each iteration. The iterator it can be accessed from within body. 
+"""
+    },
+    {
+        name = "loopwhile-thd",
+        comment = """
+loopwhile-thd is like loopwhile but the thread runs in its own thread asynchronously. The form of a loopwhile-thd is (loopwhile-thd stack cond body) . A While-loop that starts in a new thread. The argument stack is the stack-size of the thread, cond is the condition that has the be true for the loop to continue running and body is the code to execute each iteration. The difference from the regular loopwhile is that the evaluator will continue running the code after this one before this one finishes, as this loop is evaluated in a new thread. The following examples assumes that your LispBM integration has a way to print . Example that forever prints "Hello World" every two seconds: (loopwhile-thd 100 t { (print "Hello World") (sleep 2) }) The above is equivalent to the following code (spawn 100 (fn () (loopwhile t { (print "Hello World") (sleep 2) }))) It is possible to give the thread a name and/or a stack size. That gives the following combinations of possibilities: No name and default stack size (loopwhile-thd () t { (print "Hello World1") (sleep 2) }) No name and stack size 100 (loopwhile-thd 100 t { (print "Hello World2") (sleep 2) }) Name ThdTest and default stack size (loopwhile-thd "ThdTest" t { (print "Hello World3" ) (sleep 2) }) Name ThdTest2 and stack size 100 (loopwhile-thd ("ThdTest2" 100) t { (print "Hello World4") (sleep 2) })
+"""
+    },
+    {
+        name = "list-to-array",
+        comment = """
+Convert a list to an array 
+"""
+    },
+    {
+        name = "array-to-list",
+        comment = """
+Convert an array to a list 
+"""
+    },
+    {
+        name = "array?",
+        comment = """
+Array predicate is true for arrays. 
+"""
+    },
+]

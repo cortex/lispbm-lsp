@@ -1,0 +1,860 @@
+definitions = [
+    {
+        name = "+",
+        comment = """
+Adds up an arbitrary number of values. The form of a + expression is (+ expr1 ... exprN) .
+"""
+    },
+    {
+        name = "-",
+        comment = """
+Subtract an arbitrary number of values from a value. The form of a - expression is (- expr1 ... exprN) .
+"""
+    },
+    {
+        name = "*",
+        comment = """
+Multiplying an arbitrary number of values. The form of a * expression is (* expr1 ... exprN) .
+"""
+    },
+    {
+        name = "/",
+        comment = """
+Division. The form of a / expression is (/ expr1 ... exprN) . The resulting type is the same as the inputs (after their types have been promoted of course).
+"""
+    },
+    {
+        name = "mod",
+        comment = """
+Modulo operation. The form of a mod expression is (mod expr1 exp2) . The modulo operation is not generalised to n arguments.
+"""
+    },
+    {
+        name = "//",
+        comment = """
+Integer division operation. Like normal division except if the result is a floating point value it is cast to an integer, which floors the result. The form of a // expression is (// expr1 ... exprN) . Can be used as a elegant complement to mod , with // returning the quotient and mod returning the remainder of a division.
+"""
+    },
+    {
+        name = "eq",
+        comment = """
+Compare values for equality. The eq operation implements structural equality. The form of an 'eq expression is (eq expr1 ... exprN)`. Structural equality means that the values must have the identical in memory representations to be considered equal.
+"""
+    },
+    {
+        name = "not-eq",
+        comment = """
+not-eq implements the negation of eq. In other words, (not-eq a b c) evaluates to the same result as (not (eq a b c)) .
+"""
+    },
+    {
+        name = "=",
+        comment = """
+The = operation can only be used on numerical arguments. If you know you are comparing numbers, it will be more efficient to use = . An important difference between eq and = is that = compare the numerical values of the arguments. A 3 is a 3 independent of them being different types. eq on the other hand compares the representations of the arguments exactly and they must match in structure, type and value to be considered equal.
+"""
+    },
+    {
+        name = ">",
+        comment = """
+Greater than comparison. A greater than comparison has the form (> expr1 ... exprN) and evaluates to t if expr1 is greater than all of expr2 ... exprN.
+"""
+    },
+    {
+        name = "<",
+        comment = """
+Less than comparison. A less than comparison has the form (> expr1 ... exprN) and evaluates to t if expr1 is less than all of expr2 ... exprN.
+"""
+    },
+    {
+        name = ">=",
+        comment = """
+Greater than or equal comparison. A greater than comparison has the form (>= expr1 ... exprN) and evaluates to t if expr1 is greater than or equal to all of expr2 ... exprN.
+"""
+    },
+    {
+        name = "<=",
+        comment = """
+Less than or equal comparison. A less than or equal comparison has the form (<= expr1 ... exprN) and evaluates to t if expr1 is less than or equal to all of expr2 ... exprN.
+"""
+    },
+    {
+        name = "and",
+        comment = """
+Boolean and operation between n arguments. The form of an and expression is (and expr1 ... exprN) . This operation treats all non-nil values as true. Boolean and is "short-circuiting" and only evaluates until a false is encountered.
+"""
+    },
+    {
+        name = "or",
+        comment = """
+Boolean or operation between n arguments. The form of an or expression is (or expr1 ... exprN) . This operation treats all non-nil values as true. Boolean or is "short-circuiting" and only evaluates until a true is encountered.
+"""
+    },
+    {
+        name = "not",
+        comment = """
+Boolean not takes one argument. The form of a not expression is (not expr) . All non-nil values are considered true.
+"""
+    },
+    {
+        name = "list?",
+        comment = """
+the list? predicate is true for all lists, empty (nil) or not.
+"""
+    },
+    {
+        name = "number?",
+        comment = """
+the number? predicate is true for all numbers.
+"""
+    },
+    {
+        name = "shl",
+        comment = """
+The shift left operation takes two arguments. The first argument is a value to shift and the second argument is the number of bit positions to shift the value.
+"""
+    },
+    {
+        name = "shr",
+        comment = """
+The shift right operation takes two arguments. The first argument is a value to shift and the second argument in the number of bit positions to shift the value.
+"""
+    },
+    {
+        name = "bitwise-and",
+        comment = """
+Performs the bitwise and operation between two values. The type of the result is the same type as the first of the arguments.
+"""
+    },
+    {
+        name = "bitwise-or",
+        comment = """
+Performs the bitwise or operation between two values. The type of the result is the same type as the first of the arguments.
+"""
+    },
+    {
+        name = "bitwise-xor",
+        comment = """
+Performs the bitwise exclusive or operation between two values. The type of the result is the same type as the first of the arguments.
+"""
+    },
+    {
+        name = "bitwise-not",
+        comment = """
+Performs the bitwise negation operations on a value. The result is of same type as the argument.
+"""
+    },
+    {
+        name = "nil",
+        comment = """
+Represents the empty list. The nil value is also considered to be false by conditionals. nil is a symbol but it cannot be redefined and will always evaluate to itself.
+"""
+    },
+    {
+        name = "t",
+        comment = """
+All non nil values are considered true in conditionals. t should be used in cases where an explicit true makes sense. t is a symbol but it cannot be redefined and will always evaluate to itself.
+"""
+    },
+    {
+        name = "false",
+        comment = """
+false is an alias for nil .
+"""
+    },
+    {
+        name = "true",
+        comment = """
+true is an alias for t .
+"""
+    },
+    {
+        name = "quote",
+        comment = """
+When the ' quote operator is encountered by the reader it is removed and the code to the right is wrapped in (quote ...) . Evaluating a quoted expression (quote a) results in a unevaluated.
+"""
+    },
+    {
+        name = "`",
+        comment = """
+The backwards tick operator ` is called the quasiquote. It is similar to ' but allows splicing in results of computations using the and the operators. The result of '(+ 1 2) and `(+ 1 2) are similar in effect. Both result in the result value of (+ 1 2) , that is a list containing +, 1 and 2. When `(+ 1 2) is read into the heap it is expanded into the expression (append (quote (+)) (append (quote (1)) (append (quote (2)) (quote nil)))) which evaluates to the list (+ 1 2) .
+"""
+    },
+    {
+        name = ",",
+        comment = """
+The comma is used to splice the result of a computation into a quasiquotation. The expression `(+ 1 ,(+ 1 1)) is expanded by the reader into (append (quote (+)) (append (quote (1)) (append (list (+ 1 1)) (quote nil)))) . Evaluating the expression above results in the list (+ 1 2) .
+"""
+    },
+    {
+        name = ",@",
+        comment = """
+The comma-at operation is used to splice in the result of a computation (that returns a list) into a list when quasiquoting.
+"""
+    },
+    {
+        name = "identity",
+        comment = """
+The identity function takes one argument which it directly returns. The form of an identity expression is (identity expr) , where expr is an arbitrary lisp expression. (identity expr) is a function application so all normal function application rules apply. The most important property of function applications in this case is that the argument is evaluated which differentiates identity from quote which returns the argument unevaluated.
+"""
+    },
+    {
+        name = "rest-args",
+        comment = """
+rest-args are related to user defined functions. As such rest-args is also given a brief explanation in the section about the <a href="#lambda">lambda</a>. rest-args is a mechanism for handling optional arguments in functions. Say you want to define a function with 2 arguments and an optional 3rd argument. You can do this by creating a 3 argument function and check if argument 3 is valid or not in the body of the function
+"""
+    },
+    {
+        name = "set",
+        comment = """
+The set form is used to change the value of some variable in an environment. You can use set to change the value of a global definition or a local definition. An application of the set form looks like (set var-expr val-expr) where var-expr should evaluate to a symbol. The val-expr is evaluated before rebinding the variable. set returns the value that val-expr evaluates to.
+"""
+    },
+    {
+        name = "setvar",
+        comment = """
+setvar is an alias of .
+"""
+    },
+    {
+        name = "undefine",
+        comment = """
+A definition in the global environment can be removed using undefine. The form of an undefine expression is (undefine name-expr) where name-expr should evaluate to a symbol (for example 'apa ).
+"""
+    },
+    {
+        name = "eval",
+        comment = """
+Evaluate data as an expression. The data must represent a valid expression. The form of an eval expression is (eval expr) . An optional environment can be passed in as the first argument: (eval env-expr expr) .
+"""
+    },
+    {
+        name = "eval-program",
+        comment = """
+Evaluate a list of data where each element represents an expression. The form of an eval-program expression is (eval-program program-expr) . A program-expr is a list of expressions where each element in the list can be evaluated by eval . Note that eval-program can not take any extra environment argument.
+"""
+    },
+    {
+        name = "apply",
+        comment = """
+An apply expression has the form (apply fun-expr args-expr) , and it applies args-expr to fun-expr . It can loosely be emulated by (eval (cons fun-expr args-expr)) , except for the property that the elements of args-expr aren't evaluated when you use apply . args-expr itself is of course evaluated, but given the emulated form, the individual elements of the list would be evaluated again. This is a problem when your argument list may include symbols or any other values which change when evaluated. Note that fun-expr doesn't necessarily have to be a user defined function, but can be any value which can be applied, that is, a value which can be the first item in a list expression: (fun ...) . This includes (but is not limited to) user define functions (which end up as values), built-in functions, extensions, s, and even special forms (but see Footgun: Special forms below).
+"""
+    },
+    {
+        name = "read",
+        comment = """
+Parses a string resulting in either an expression or the <a href="#read_error">read_error</a> in case the string can not be parsed into an expression. The form of a read expression is (read string) .
+"""
+    },
+    {
+        name = "read-program",
+        comment = """
+Parses a string containing multiple sequenced expressions. The resulting list of expressions can be evaluated as a program using <a href="#eval-program">eval-program</a>. The form of a read-program expression is (read-program string) .
+"""
+    },
+    {
+        name = "read-eval-program",
+        comment = """
+Parses and evaluates a program incrementally. read-eval-program reads a top-level expression then evaluates it before reading the next.
+"""
+    },
+    {
+        name = "type-of",
+        comment = """
+The type-of function returns a symbol that indicates what type the argument is. The form of a type-of expression is (type-of expr) .
+"""
+    },
+    {
+        name = "sym2str",
+        comment = """
+The sym2str function converts a symbol to its string representation. The resulting string is a copy of the original so you cannot destroy built in symbols using this function.
+"""
+    },
+    {
+        name = "str2sym",
+        comment = """
+The str2sym function converts a string to a symbol.
+"""
+    },
+    {
+        name = "sym2u",
+        comment = """
+The sym2u function returns the numerical value used by the runtime system for a symbol.
+"""
+    },
+    {
+        name = "u2sym",
+        comment = """
+The u2sym function returns the symbol associated with the numerical value provided. This symbol may be undefined in which case you get as result a unnamed symbol.
+"""
+    },
+    {
+        name = "gc",
+        comment = """
+The gc function runs the garbage collector so that it can reclaim values from the heap and LBM memory that are no longer needed. Note that one should not need to run this function. GC is run automatically when needed.
+"""
+    },
+    {
+        name = "if",
+        comment = """
+Conditionals are written as (if cond-expr then-expr else-exp) . If the cond-expr evaluates to the else-expr will be evaluated. For any other value of cond-expr the then-expr will be evaluated.
+"""
+    },
+    {
+        name = "cond",
+        comment = """
+cond is a generalization of if to discern between n different cases based on boolean expressions. The form of a cond expression is: (cond ( cond-expr1 expr1) (cond-expr2 expr2) ... (cond-exprN exprN)) . The conditions are checked from first to last and for the first cond-exprN that evaluates to true, the corresponding exprN is evaluated. If no cond-exprN evaluates to true, the result of the entire conditional is nil .
+"""
+    },
+    {
+        name = "lambda",
+        comment = """
+You create an anonymous function with lambda. The function can be given a name by binding the lambda expression using <a href="#define">define</a> or <a href="#let">let</a>. A lambda expression has the form (lambda param-list body-expr) .
+"""
+    },
+    {
+        name = "closure",
+        comment = """
+A <a href="#lambda"> lambda </a> expression evaluates into a closure which is very similar to a <a href="#lambda">lambda</a> but extended with a captured environment for any names unbound in the param-list appearing in the body-expr. The form of a closure is (closure param-list body-exp environment) .
+"""
+    },
+    {
+        name = "let",
+        comment = """
+Local environments are created using let. The let binding in lispbm allows for mutually recursive bindings. The form of a let is (let list-of-bindings body-expr) and evaluating this expression means that body-expr is evaluted in an environment extended with the list-of-bindings.
+"""
+    },
+    {
+        name = "loop",
+        comment = """
+loop allows to repeatedly evaluate an expression for as long as a condition holds. The form of a loop is (loop list-of-local-bindings condition-exp body-exp) . The list-of-local-bindings are very similar to how let works, just that here the body-exp is repeated.
+"""
+    },
+    {
+        name = "define",
+        comment = """
+You can give names to values in a global scope by using define. The form of define is (define name expr) . The given expression is evaluated and the result is stored in the global environment under name . In lispbm you can redefine already defined values. It is also possible to remove bindings from the global environment, see .
+"""
+    },
+    {
+        name = "setq",
+        comment = """
+The setq special-form is similar to set and to setvar but expects the first argument to be a symbol. The first argument to setq is NOT evaluated.
+"""
+    },
+    {
+        name = "progn",
+        comment = """
+The progn special form allows you to sequence a number of expressions. The form of a progn expression is (progn expr1 ... exprN) . The evaluation result of a progn sequence is the value that the last exprN evaluated to. This is useful for sequencing of side-effecting operations.
+"""
+    },
+    {
+        name = "{",
+        comment = """
+The curlybrace { syntax is a short-form (syntactic sugar) for (progn . The reader replaces occurrences of { with (progn . The { should be closed with an } . These two programs are thus equivalent: (progn (define a 10) (define b 20) (+ a b)) And { (define a 10) (define b 20) (+ a b) }
+"""
+    },
+    {
+        name = "}",
+        comment = """
+The closing curlybrace } should be used to close an opening { but purely for esthetic reasons. The } is treated identically to a regular closing parenthesis ) . The opening { and closing } curlybraces are used as a short-form for progn -blocks of sequences expressions.
+"""
+    },
+    {
+        name = "var",
+        comment = """
+The var special form allows local bindings in a progn expression. A var expression is of the form (var symbol expr) and the symbol symbol is bound to the value that expr evaluates to withing the rest of the progn expression.
+"""
+    },
+    {
+        name = "trap",
+        comment = """
+trap lets you catch an error rather than have the evaluation context terminate. The form of a trap expression is (trap expr) . If expr crashes with an error e then (trap expr) evaluates to (exit-error e) . If expr successfully runs and returns r , then (trap expr) evaluates to (exit-ok r) .
+"""
+    },
+    {
+        name = "car",
+        comment = """
+Use car to access the car field of a cons cell. A car expression has the form (car expr) . Taking the car of a number of symbol type is in general a <a href="#type_error">type_error</a>.
+"""
+    },
+    {
+        name = "first",
+        comment = """
+first is an alternative name for the car operation. Use first to access the first element of a list or pair. A first expression has the form (first expr) .
+"""
+    },
+    {
+        name = "cdr",
+        comment = """
+Use cdr to access the cdr field of a cons cell. A cdr expression has the form (cdr expr) .
+"""
+    },
+    {
+        name = "rest",
+        comment = """
+rest is an alternative name for the cdr operation. Use rest to access all elements except the first one of a list, or to access the second element in a pair. A rest expression has the form (rest expr) .
+"""
+    },
+    {
+        name = "cons",
+        comment = """
+The cons operation allocates a cons cell from the heap and populates the car and the cdr fields of this cell with its two arguments. The form of a cons expression is (cons expr1 expr2) . To build well formed lists the innermost cons cell should have nil in the cdr field.
+"""
+    },
+    {
+        name = ".",
+        comment = """
+The dot, . , operation creates a pair. The form of a dot expression is (expr1 . expr2) . By default the evaluator will attempt to evaluate the result of (expr1 . expr2) unless it is prefixed with ' .
+"""
+    },
+    {
+        name = "list",
+        comment = """
+The list function is used to create proper lists. The function takes n arguments and is of the form (list expr1 ... exprN) .
+"""
+    },
+    {
+        name = "length",
+        comment = """
+Computes the length of a list. The length function takes one argument and is of the form (length expr) .
+"""
+    },
+    {
+        name = "range",
+        comment = """
+The range function computes a list with integer values from a range specified by its endpoints. The form of a range expression is (range start-expr end-expr) . The end point in the range is excluded.
+"""
+    },
+    {
+        name = "append",
+        comment = """
+The append function combines two lists into a longer list. An append expression is of the form (append expr1 expr2) .
+"""
+    },
+    {
+        name = "ix",
+        comment = """
+Index into a list using the ix function. The form of an ix expression is (ix list-expr index-expr) . Indexing starts from 0 and if you index out of bounds the result is nil. A negative index accesses values starting from the end of the list.
+"""
+    },
+    {
+        name = "setix",
+        comment = """
+Destructively update an element in a list. The form of a setix expression is (setix list-expr index-expr value-expr) . Indexing starts from 0 and if you index out of bounds the result is nil. A negative value -n will update the nth value from the end of the list.
+"""
+    },
+    {
+        name = "member",
+        comment = """
+Check if a value is included in a list. The form of a member expression is (member value-expr list-expr) . If the value is found, member returns the entire list, otherwise it returns nil . Equality is checked structurally, in the same way as , meaning if you're checking numbers the types must match (see the following examples).
+"""
+    },
+    {
+        name = "setcar",
+        comment = """
+The setcar is a destructive update of the car field of a cons-cell.
+"""
+    },
+    {
+        name = "setcdr",
+        comment = """
+The setcdr is a destructive update of the cdr field of a cons-cell.
+"""
+    },
+    {
+        name = "take",
+        comment = """
+take creates a list containing the n first elements of another list. The form of a take expression is (take list-exp n-exp) .
+"""
+    },
+    {
+        name = "drop",
+        comment = """
+drop creates a list from another list by dropping the n first elements of that list. The form of a drop expression is (drop list-exp n-exp) .
+"""
+    },
+    {
+        name = "reverse",
+        comment = """
+reverse creates a list containing the same elements as an existing list but in reverse order. The form of a reverse expression is (reverse list-exp) .
+"""
+    },
+    {
+        name = "rotate",
+        comment = """
+rotate creates a list containing the same elements as an existing list but rotated some number of step along a direction. The form of a rotate expression is (rotate list-exp dist-expr) . The sign of the value dist-expr evaluates to, decides direction of rotation.
+"""
+    },
+    {
+        name = "merge",
+        comment = """
+merge merges two lists that are ordered according to a comparator into a single ordered list. The form of a merge expression is (merge comparator-exp list-exp1 list-exp2) .
+"""
+    },
+    {
+        name = "sort",
+        comment = """
+sort orders a list of values according to a comparator. The sorting algorithm used is an in-place merge-sort. A copy of the input list is created at the beginning of the sort to provide a functional interface from the user's point of view. The form of a sort expression is (sort comparator-exp list-exp)
+"""
+    },
+    {
+        name = "acons",
+        comment = """
+The acons form is similar to cons , it attaches one more element onto an alist. The element that is added consists of a key and a value so acons takes one more argument than cons . The form of an acons expression is (acons key-expr val-expr alist-expr) . The alist-expr should evaluate to an alist but there are no checks to ensure this. Example that adds the key 4 and associated value lemur to an existing alist.
+"""
+    },
+    {
+        name = "assoc",
+        comment = """
+The assoc function looks up the first value in an alist matching a given a key. The form of an assoc expression is (assoc alist-expr key-expr)
+"""
+    },
+    {
+        name = "cossa",
+        comment = """
+The cossa function looks up the first key in an alist that matches a given value. The form of an cossa expression is (cossa alist-expr value-expr)
+"""
+    },
+    {
+        name = "setassoc",
+        comment = """
+The setassoc function destructively updates a key-value mapping in an alist. The form of a setassoc expression is (setassoc alist-expr key-expr value-expr) . If you assign a key which doesn't exist in the original alist, it is left unchanged, while another association pair is added to the returned list.
+"""
+    },
+    {
+        name = "bufcreate",
+        comment = """
+Create an array of bytes. The form of a bufcreate expression is (bufcreate size-expr) .
+"""
+    },
+    {
+        name = "buflen",
+        comment = """
+Returns the size of a buffer in number of bytes. The form of an buflen expression is (buflen buf-expr) where buf-expr has to evaluate into a buffer.
+"""
+    },
+    {
+        name = "bufget-[X]",
+        comment = """
+Read a value from a buffer. The contents of a buffer can be read as a sized integer or unsigned value using as many bytes from the buffer as the X portion of the function name implies. The form of a bufget expression is (bufget-[X] buf-expr ix-expr) where ix-expr evaluates to a number indicating the byte position to start reading from.
+"""
+    },
+    {
+        name = "bufset-[X]",
+        comment = """
+The bufset functions performs a destructive updates to a buffer. The form of a bufset expression is (bufset-[X] buf-expr ix-expr val-expr) where ix-expr evaluates to a number indicating where in the buffer to start writing and val-expr is the value to write.
+"""
+    },
+    {
+        name = "bufclear",
+        comment = """
+To clear a byte array the function bufclear can be used (bufclear arr optByte optStart optLen) Where arr is the byte array to clear, optByte is the optional argument of what to clear with (default 0), optStart is the optional argument of which position to start clearing (default 0) and optLen is the optional argument of how many bytes to clear after start (default the entire array). Example:
+"""
+    },
+    {
+        name = "Byte buffer literal syntax",
+        comment = """
+Byte buffer literals can be created using the [ and ] syntax to enclose values to initialize the array with. The [ and ] syntax is complete resolved in the reader and thus cannot contain arbitrary lisp terms. the values listed between the [ and the ] must be literals! The form of the [ and ] syntax is [ val1 ... valN ] .
+"""
+    },
+    {
+        name = "array literals",
+        comment = """
+An array literal are specified as a sequence of lisp values between [| and |] . Values in a literal array are not evaluated.
+"""
+    },
+    {
+        name = "array",
+        comment = """
+array takes n arguments and creates an array holding those arguments as values. The form of an array expression is (array expr1 ... exprN) .
+"""
+    },
+    {
+        name = "mkarray",
+        comment = """
+Allocate an array with mkarray . Arrays are allocated in arrays and byte buffer memory. The form an mkarray expression is (mkarray num-expr) . Note that there is currently no literal syntax for arrays. The example below allocates an array in "lbm_memory" (arrays and byte-buffer memory).
+"""
+    },
+    {
+        name = "ix",
+        comment = """
+Index into an array using the ix function. The form of an ix expression is (ix array-expr index-expr) . Indexing starts from 0 and if you index out of bounds the result is nil. A negative index accesses values starting from the end of the array.
+"""
+    },
+    {
+        name = "setix",
+        comment = """
+Destructively update an element in an array. The form of a setix expression is (setix arr-expr index-expr value-expr) . Indexing starts from 0 and if you index out of bounds the result is nil. A negative value -n will update the nth value from the end of the list.
+"""
+    },
+    {
+        name = "dm-create",
+        comment = """
+dm-create creates a region of defragmentable memory for bytearrays within LBM memory. The form of a dm-create expression is (dm-create size-expr) .
+"""
+    },
+    {
+        name = "dm-alloc",
+        comment = """
+dm-alloc is used to allocate a byte-array from a region of defragmentable memory. The form of a dm-alloc expression is (dm-alloc DM-expr size-expr) . where DM-expr evaluates to the defragmentable region to allocate from and size-expr is the number of bytes to allocate. Each allocation uses up 12 extra bytes of header that you do not include in size-expr .
+"""
+    },
+    {
+        name = "match",
+        comment = """
+Pattern-matching is expressed using match. The form of a match expression is (match expr (pat1 expr1) ... (patN exprN)) . Pattern-matching compares the shape of an expression to each of the pat1 ... patN and evaluates the expression exprM of the pattern that matches. In a pattern you can use a number of match-binders or wildcards: _ , ? , ?i , ?u , ?float .
+"""
+    },
+    {
+        name = "no_match",
+        comment = """
+The no_match symbol is returned from pattern matching if no case matches the expression.
+"""
+    },
+    {
+        name = "_",
+        comment = """
+The underscore pattern matches anything.
+"""
+    },
+    {
+        name = "?",
+        comment = """
+The ? pattern matches anything and binds that anything to variable. Using the ? pattern is done as (? var) and the part of the expression that matches is bound to var .
+"""
+    },
+    {
+        name = "Match with guards",
+        comment = """
+Patterns used in a match expressions can be augmented with a boolean guard to further discern between cases. A pattern with a guard is of the form (pattern-expr guard-expr expr) . A pattern with a guard, matches only if the pattern structurally matches and if the guard-expr evaluates to true in the match environment.
+"""
+    },
+    {
+        name = "spawn",
+        comment = """
+Use spawn to launch a concurrent process. Spawn takes a closure and arguments to pass to that closure as its arguments. The form of a spawn expression is (spawn opt-name opt-stack-size closure arg1 ... argN) . Each process has a runtime-stack which is used for the evaluation of expressions within that process. The stack size needed by a process depends on 1. How deeply nested expressions evaluated by the process are. 2. Number of recursive calls (Only if a function is NOT tail-recursive). 3. The Number of arguments that functions called by the process take. Having a stack that is too small will result in a out_of_stack error. The default stack size is 256 words (1K Bytes) and should be more than enough for reasonable programs. Many processes will work perfectly fine with a lot less stack. You can find a good size by trial and error.
+"""
+    },
+    {
+        name = "spawn-trap",
+        comment = """
+Use spawn-trap to spawn a child process and enable trapping of exit conditions for that child. The form of a spawn-trap expression is (spawn-trap opt-name opt-stack-size closure arg1 .. argN) . If the child process is terminated because of an error, a message is sent to the parent process of the form (exit-error tid err-val) . If the child process terminates successfully a message of the form (exit-ok tid value) is sent to the parent.
+"""
+    },
+    {
+        name = "self",
+        comment = """
+Use self to obtain the thread-id of the thread in which self is evaluated. The form of a self expression is (self) . The thread id is of an integer type.
+"""
+    },
+    {
+        name = "wait",
+        comment = """
+Use wait to wait for a spawned process to finish. The argument to wait should be a process id. The wait blocks until the process with the given process id finishes. When the process with with the given id finishes, the wait function returns True. Be careful to only wait for processes that actually exist and do finish. Otherwise you will wait forever.
+"""
+    },
+    {
+        name = "yield",
+        comment = """
+To put a process to sleep, call yield . The argument to yield is number indicating at least how many microseconds the process should sleep.
+"""
+    },
+    {
+        name = "sleep",
+        comment = """
+'sleep' puts a thread to sleep and differs from 'yield' only in the argument. 'sleep' takes a floating point number indicating how long in seconds the thread should sleep at least.
+"""
+    },
+    {
+        name = "atomic",
+        comment = """
+atomic can be used to execute a LispBM one or more expression without allowing the runtime system to switch process during that time. atomic is similar to progn with the addition of being uninterruptible.
+"""
+    },
+    {
+        name = "exit-ok",
+        comment = """
+The exit-ok function terminates the thread in a "successful" way and returns a result specified by the programmer. The form of an exit-ok expression is (exit-ok value) . If the process that calls exit-ok was created using spawn-trap a message of the form (exit-ok tid value) is be sent to the parent of this process.
+"""
+    },
+    {
+        name = "exit-error",
+        comment = """
+The exit-error function terminates the thread with an error specified by the programmer. The form of an exit-error expression is (exit-error err_val) . If the process that calls exit-error was created using spawn-trap a message of the form (exit-error tid err_val) is sent to the parent of this process.
+"""
+    },
+    {
+        name = "kill",
+        comment = """
+The kill function allows you to force terminate another thread. It has the signature (kill thread-id-expr val-expr) , where thread-id-expr is the thread that you want to terminate, and val-expr is the final result the thread dies with.
+"""
+    },
+    {
+        name = "send",
+        comment = """
+Messages can be sent to a process by using send . The form of a send expression is (send pid msg) . The message, msg, can be any LispBM value.
+"""
+    },
+    {
+        name = "recv",
+        comment = """
+To receive a message use the recv command. A process will block on a recv until there is a matching message in the mailbox. The recv syntax is very similar to match .
+"""
+    },
+    {
+        name = "recv-to",
+        comment = """
+Like recv , recv-to is used to receive messages but recv-to takes an extra timeout argument. It then receives a message containing the symbol timeout after the timeout period ends. The form of an recv-to expression is (recv-to timeout-secs (pattern1 exp1) ... (patternN expN))
+"""
+    },
+    {
+        name = "flatten",
+        comment = """
+The flatten function takes a value as single argument and returns the flat representation if successful. A flatten expression has the form (flatten expr) . Note that expr is evaluated before the flattening. A flat value can be turned back into a normal lisp value applying unflatten
+"""
+    },
+    {
+        name = "unflatten",
+        comment = """
+unflatten converts a flat value back into a lisp value. Te form of an unflatten expression is (unflatten flat-value)
+"""
+    },
+    {
+        name = "macro",
+        comment = """
+The form of a macro expression is: (macro args body)
+"""
+    },
+    {
+        name = "call-cc",
+        comment = """
+The form of a call-cc expression is (call-cc f) , where f is a function taking a continuation k. In code most uses of call-cc will have the form (call-cc (lambda (k) expr )) . When using call-cc the expr above is allowed to bind k to a global variable.
+"""
+    },
+    {
+        name = "call-cc-unsafe",
+        comment = """
+call-cc-unsafe is similar to call-cc in form. (call-cc-unsafe f) and in code usually as (call-cc-unsafe (lambda (k) expr)) . When using call-cc-unsafe you must NOT let the k leak out of the scope created by the enclosing call-cc-unsafe ! That is, if k is used at all, it must be within expr . Binding k (directly or indirectly) to a global is a violation of the trust I am putting in you.
+"""
+    },
+    {
+        name = "read_error",
+        comment = """
+The read_error symbol is returned if the reader cannot parse the input code. Read errors are most likely caused by syntactically incorrect input programs.
+"""
+    },
+    {
+        name = "type_error",
+        comment = """
+The type_error symbol is returned by built-in functions or extensions if the values passed in are of incompatible types.
+"""
+    },
+    {
+        name = "eval_error",
+        comment = """
+The eval_error symbol is returned if evaluation could not proceed to evaluate the expression. This could be because the expression is malformed. Evaluation error happens on programs that may be syntactically correct (LispBM has a very low bar for what is considered syntactically correct), but semantically nonsensical.
+"""
+    },
+    {
+        name = "out_of_memory",
+        comment = """
+The out_of_memory symbol is returned if the heap is full and running the garbage collector was not able to free any memory up. The program you have written requires more memory.
+"""
+    },
+    {
+        name = "fatal_error",
+        comment = """
+The fatal_error symbol is returned in cases where the LispBM runtime system cannot proceed. Something is corrupt and it is not safe to continue.
+"""
+    },
+    {
+        name = "out_of_stack",
+        comment = """
+The out_of_stack symbol is returned if the evaluator runs out of continuation stack (this is its runtime-stack). You are most likely writing a non-tail-recursive function that is exhausting all the resources.
+"""
+    },
+    {
+        name = "division_by_zero",
+        comment = """
+The division_by_zero symbol is returned when dividing by zero.
+"""
+    },
+    {
+        name = "variable_not_bound",
+        comment = """
+The variable_not_bound symbol is returned when evaluating a variable (symbol) that is neighter bound nor special (built-in function).
+"""
+    },
+    {
+        name = "@const-start",
+        comment = """
+@const-start opens a block of code where each global definition is moved to constant memory (flash) automatically. This can be used only together with the incremental reader (such as read-eval-program ). A @const-start opened block should be closed with a @const-end . Constant blocks cannot be nested. @const-start (defun f (x) (+ x 1)) @const-end (+ (f 1) 2)
+"""
+    },
+    {
+        name = "@const-end",
+        comment = """
+@const-end closes an block opened by @const-start .
+"""
+    },
+    {
+        name = "move-to-flash",
+        comment = """
+A value can be moved to flash storage to save space on the normal evaluation heap or lbm memory. A move-to-flash expression is of the form (move-to-flash sym opt-sym1 ... opt-symN) . The symbols sym , opt-sym1 ... opt-symN should be globally bound to the values you want moved to flash. After the value has been moved, the environment binding is updated to point into flash memory. CAUTION This function should be used carefully. Ideally a value should be moved to flash immediately after it is created so there is no chance that other references to original value exists.
+"""
+    },
+    {
+        name = "to-byte",
+        comment = """
+Convert any numerical value to a byte. If the input is not a number the output of this function will be 0.
+"""
+    },
+    {
+        name = "to-i",
+        comment = """
+Convert a value of any numerical type to an integer. The resulting integer is a 28bit value on 32bit platforms and 56 bits on 64 bit platforms. If the input is not a number the output of this function will be 0.
+"""
+    },
+    {
+        name = "to-u",
+        comment = """
+Convert a value of any numerical type to an unsigned integer. The resulting integer is a 28bit value on 32bit platforms and 56 bits on 64 bit platforms. If the input is not a number the output of this function will be 0.
+"""
+    },
+    {
+        name = "to-i32",
+        comment = """
+Convert any numerical value to a 32bit int. If the input is not a number the output of this function will be 0.
+"""
+    },
+    {
+        name = "to-u32",
+        comment = """
+Convert any numerical value to a 32bit unsigned int.
+"""
+    },
+    {
+        name = "to-float",
+        comment = """
+Convert any numerical value to a single precision floating point value. If the input is not a number the output of this function will be 0.
+"""
+    },
+    {
+        name = "to-i64",
+        comment = """
+Convert any numerical value to a 64bit int. If the input is not a number the output of this function will be 0.
+"""
+    },
+    {
+        name = "to-u64",
+        comment = """
+Convert any numerical value to a 64bit unsigned int. If the input is not a number the output of this function will be 0.
+"""
+    },
+    {
+        name = "to-double",
+        comment = """
+Convert any numerical value to a double precision floating point value. If the input is not a number the output of this function will be 0.
+"""
+    }
+]

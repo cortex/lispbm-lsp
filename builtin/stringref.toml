@@ -1,0 +1,92 @@
+definitions = [
+    {
+        name = "str-from-n",
+        comment = """
+str-from-n converts a number to its string representation. The form is (str-from-n number) or (str-from-n number format) where format is an optional printf-style format string. Floats default to "%g" format, integers default to "%d" . The result is at most 100 characters long. 
+"""
+    },
+    {
+        name = "str-to-i",
+        comment = """
+str-to-i parses a string as an integer. The form is (str-to-i string) or (str-to-i string base) . The optional base argument specifies the number base. Base 0 auto-detects the base from the string prefix ( 0x for hex, 0 for octal, otherwise decimal). Returns an i32 . 
+"""
+    },
+    {
+        name = "str-to-f",
+        comment = """
+str-to-f parses a string as a floating-point number. The form is (str-to-f string) . Returns an f32 . 
+"""
+    },
+    {
+        name = "to-str",
+        comment = """
+to-str converts one or more LispBM values to a string. The form is (to-str val1 val2 ...) . Multiple values are separated by a single space. The result is at most 300 characters long. 
+"""
+    },
+    {
+        name = "to-str-delim",
+        comment = """
+to-str-delim converts one or more LispBM values to a string using a custom delimiter between values. The form is (to-str-delim delimiter val1 val2 ...) . The first argument is the delimiter string. The result is at most 300 characters long. 
+"""
+    },
+    {
+        name = "str-len",
+        comment = """
+str-len returns the length of a string in characters, not counting the null terminator. The form is (str-len string) . 
+"""
+    },
+    {
+        name = "str-part",
+        comment = """
+str-part extracts a substring from a string. The form is (str-part string start) or (str-part string start length) . Returns a new string starting at character index start , optionally limited to length characters. Returns an error if start is beyond the end of the string. 
+"""
+    },
+    {
+        name = "str-join",
+        comment = """
+str-join concatenates a list of strings into a single string. The form is (str-join strings) or (str-join strings delimiter) where delimiter is an optional string inserted between each element. The default delimiter is the empty string. 
+"""
+    },
+    {
+        name = "str-split",
+        comment = """
+str-split splits a string into a list of substrings. The form is (str-split string delimiter) where delimiter is either a string or an integer. When delimiter is a string, the input is split at any character found in the delimiter string. When delimiter is an integer, the input is split into chunks of that many characters. 
+"""
+    },
+    {
+        name = "str-replace",
+        comment = """
+str-replace replaces all occurrences of a pattern in a string. The form is (str-replace string pattern replacement) or (str-replace string pattern) to remove all occurrences. Returns a new string with all occurrences of pattern replaced. 
+"""
+    },
+    {
+        name = "str-replicate",
+        comment = """
+str-replicate creates a string by repeating a character. The form is (str-replicate n char) where n is the number of characters and char is the character as a byte value. Returns a new string of length n . 
+"""
+    },
+    {
+        name = "str-cmp",
+        comment = """
+str-cmp compares two strings lexicographically. The form is (str-cmp str1 str2) or (str-cmp str1 str2 n) where n limits the comparison to the first n characters. Returns a negative integer if str1 is less than str2 , zero if they are equal, and a positive integer if str1 is greater. 
+"""
+    },
+    {
+        name = "str-find",
+        comment = """
+str-find searches for a substring within a string. The form is (str-find string substr) with optional additional arguments. Returns the index of the first match, or -1 if not found. The substr argument can also be a list of strings, in which case the search finds any of them. Optional arguments (may be given in any order after substr ): 
+"""
+    },
+    {
+        name = "str-to-lower",
+        comment = """
+str-to-lower converts a string to lowercase. The form is (str-to-lower string) . Returns a new string with all characters converted to lowercase. 
+"""
+    },
+    {
+        name = "str-to-upper",
+        comment = """
+str-to-upper converts a string to uppercase. The form is (str-to-upper string) . Returns a new string with all characters converted to uppercase. 
+"""
+    }
+]

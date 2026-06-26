@@ -1,0 +1,56 @@
+definitions = [
+    {
+        name = "ttf-prepare",
+        comment = """
+ttf-prepare initializes font and prerenders glyphs. The result of ttf-prepare is a binary blob conaining all the information needed to print text using the prepared glyphs The form of a ttf-prepare expression is: (ttf-prepare font-data scale img-format utf8-str) . Note that only characters mentioned in the utf-string will be usable. 
+"""
+    },
+    {
+        name = "ttf-text",
+        comment = """
+ttf-text draws text on an image from the display library . The form of an ttf-text expression is (ttf-text img pos-x pos-y colors font-blob utf8-str opt-dir opt-linespacing) . 
+"""
+    },
+    {
+        name = "ttf-line-height",
+        comment = """
+Obtain line-height from a prepared font object. 
+"""
+    },
+    {
+        name = "ttf-ascender",
+        comment = """
+Obtain the ascender metrics from a prepared font object. 
+"""
+    },
+    {
+        name = "ttf-descender",
+        comment = """
+Obtain the descender metrics from a prepared font object. 
+"""
+    },
+    {
+        name = "ttf-line-gap",
+        comment = """
+Obtain the line-gap metrics from a prepared font object. 
+"""
+    },
+    {
+        name = "ttf-glyph-dims",
+        comment = """
+Obtain the dimensions of a glyph from a prepared font object. 
+"""
+    },
+    {
+        name = "ttf-text-dims",
+        comment = """
+Obtain the dimensions of a string of text rendered using a prepared font object. 
+"""
+    },
+    {
+        name = "Example: Using a font",
+        comment = """
+
+"""
+    }
+]

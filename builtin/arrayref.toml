@@ -1,0 +1,44 @@
+definitions = [
+    {
+        name = "buflen",
+        comment = """
+buflen returns the size of a byte array in bytes. The form of a buflen expression is (buflen buf) . 
+"""
+    },
+    {
+        name = "bufclear",
+        comment = """
+bufclear clears a byte array by setting bytes to a given value. The form is (bufclear buf) or with optional arguments (bufclear buf byte start len) . All optional arguments can be omitted from the right. The default fill byte is 0, the default start is 0, and the default length is the remainder of the array from start. Returns t . 
+"""
+    },
+    {
+        name = "bufcpy",
+        comment = """
+bufcpy copies bytes from one byte array to another. The form is (bufcpy dst dst-start src src-start len) . Copies len bytes from src starting at src-start into dst starting at dst-start . The number of bytes copied is clamped to fit within both arrays. Returns t . 
+"""
+    },
+    {
+        name = "bufset-[X]",
+        comment = """
+The bufset functions write a typed value into a byte array at a given byte index. The form is (bufset-[X] buf index value) or (bufset-[X] buf index value 'little-endian) . The available variants are: Multi-byte variants default to big-endian byte order. Pass 'little-endian as the optional fourth argument to write in little-endian order. Returns t on success. 
+"""
+    },
+    {
+        name = "bufset-bit",
+        comment = """
+bufset-bit sets a single bit in a byte array. The form is (bufset-bit buf bit-pos value) . The bit-pos argument is the absolute bit position in the array, where bit 0 is the least significant bit of byte 0, bit 8 is the least significant bit of byte 1, and so on. A truthy value sets the bit to 1; a falsy value sets it to 0. Returns t . 
+"""
+    },
+    {
+        name = "bufget-[X]",
+        comment = """
+The bufget functions read a typed value from a byte array at a given byte index. The form is (bufget-[X] buf index) or (bufget-[X] buf index 'little-endian) . The available variants are: Multi-byte variants default to big-endian byte order. Pass 'little-endian as the optional third argument to read in little-endian order. The byte order used when reading must match the byte order used when writing. 
+"""
+    },
+    {
+        name = "free",
+        comment = """
+free explicitly frees a byte array, returning its memory immediately rather than waiting for garbage collection. The form is (free buf) . The array must be a read-write (non-constant) byte array. Returns t on success or nil if the array could not be freed. After calling free , the array must not be accessed again. Use free with care. Accessing a freed array results in undefined behaviour. 
+"""
+    }
+]

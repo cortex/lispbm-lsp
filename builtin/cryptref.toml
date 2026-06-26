@@ -1,0 +1,110 @@
+definitions = [
+    {
+        name = "sha256",
+        comment = """
+sha256 computes the SHA-256 hash of a byte array. The form of a sha256 expression is (sha256 buf) where buf is a byte array of any length. Returns a 32-byte array containing the hash. Specified in FIPS PUB 180-4. 
+"""
+    },
+    {
+        name = "sha256-str",
+        comment = """
+sha256-str computes the SHA-256 hash of a string. The form of a sha256-str expression is (sha256-str str) where str is a string. The null terminator is not included in the hash. Returns a 32-byte array containing the hash. Specified in FIPS PUB 180-4. 
+"""
+    },
+    {
+        name = "aes128-enc",
+        comment = """
+aes128-enc encrypts a single 16-byte block using AES-128. The form of an aes128-enc expression is (aes128-enc key data) where key is a 16-byte array and data is a 16-byte array. Returns a 16-byte array containing the encrypted block. This is a raw block cipher — the caller is responsible for padding and any block chaining mode. Specified in FIPS 197. 
+"""
+    },
+    {
+        name = "aes128-dec",
+        comment = """
+aes128-dec decrypts a single 16-byte block using AES-128. The form of an aes128-dec expression is (aes128-dec key data) where key is a 16-byte array and data is a 16-byte array. Returns a 16-byte array containing the decrypted block. This is a raw block cipher — the caller is responsible for unpadding and any block chaining mode. Specified in FIPS 197. 
+"""
+    },
+    {
+        name = "aes256-enc",
+        comment = """
+aes256-enc encrypts a single 16-byte block using AES-256. The form of an aes256-enc expression is (aes256-enc key data) where key is a 32-byte array and data is a 16-byte array. Returns a 16-byte array containing the encrypted block. This is a raw block cipher — the caller is responsible for padding and any block chaining mode. Specified in FIPS 197. 
+"""
+    },
+    {
+        name = "aes256-dec",
+        comment = """
+aes256-dec decrypts a single 16-byte block using AES-256. The form of an aes256-dec expression is (aes256-dec key data) where key is a 32-byte array and data is a 16-byte array. Returns a 16-byte array containing the decrypted block. This is a raw block cipher — the caller is responsible for unpadding and any block chaining mode. Specified in FIPS 197. 
+"""
+    },
+    {
+        name = "bytes-to-hex",
+        comment = """
+bytes-to-hex converts a byte array to a lowercase hexadecimal string. The form of a bytes-to-hex expression is (bytes-to-hex buf) where buf is a byte array. Each byte is represented as exactly two hex digits. Returns a string of length 2 * (buflen buf) . 
+"""
+    },
+    {
+        name = "hex-to-bytes",
+        comment = """
+hex-to-bytes converts a lowercase or uppercase hexadecimal string to a byte array. The form of a hex-to-bytes expression is (hex-to-bytes str) where str is a string containing an even number of hex digits. 
+"""
+    },
+    {
+        name = "bn-add",
+        comment = """
+bn-add adds two bignum values The form of a bn-add expression is (bn-add a b) where a and b are bignum. 
+"""
+    },
+    {
+        name = "bn-cmp",
+        comment = """
+bn-cmp compares two bignum values and return 1,0 or -1 depending on if the first argument is larger, equal, smaller than the second. The form of a bn-cmp expression is (bn-cmp a b) where a and ´b` are bignum. 
+"""
+    },
+    {
+        name = "bn-divmod",
+        comment = """
+bn-divmod computes the quotient and remainder of an bignum (integer) division. The form of a bn-divmod expression is (bn-divmod a b) where a and b are bignum. 
+"""
+    },
+    {
+        name = "bn-from-bytes",
+        comment = """
+bn-from-bytes creates a bignum from a bytearray. The internal representation of a bignum is as a little-endian value for implementation efficiency reasons and converting a bytearray to a bignum reverses the byte order The form of a bn-from-bytes expression is (bn-from-bytes ba) where ba is a bytearray that is a multiple of 4 bytes long 
+"""
+    },
+    {
+        name = "bn-from-u32",
+        comment = """
+bn-from-u32 creates a bignum from an u 32. The form of a bn-from-u32 expression is (bn-from-u32 a) where a is a number that will be interpreted as a u32. 
+"""
+    },
+    {
+        name = "bn-modexp",
+        comment = """
+bn-modexp computes bignum exponentiation modulo a modulus. The form of a bn-modexp expression is (bn-modexp a e m) where a is a bignum value, e is bignum exponent and m is bignum modulo. 
+"""
+    },
+    {
+        name = "bn-mul",
+        comment = """
+bn-mul multiplies two bignum values The form of a bn-mul expression is (bn-mul a b) where a and b are bignum. 
+"""
+    },
+    {
+        name = "bn-sub",
+        comment = """
+bn-sub subtracts a bignum from another bignum value The form of a bn-sub expression is (bn-sub a b) where a and b are bignum. Requires that the first argument is larger than the second. 
+"""
+    },
+    {
+        name = "bn-to-bytes",
+        comment = """
+bn-to-bytes converts a bignum to a bytearray that is compatible with bn-from-bytes . the form of a bn-to-bytes expression is (bn-to-bytes a) where a is a bignum. 
+"""
+    },
+    {
+        name = "bn-to-u32",
+        comment = """
+bn-to-u32 converts a bignum to a u32 value. the form of a bn-to-u32 expression is (bn-to-u32 a) where a is a bignum. Note that this requires that the bignum is a so-called single-limb value, that is it needs to <= 0xFFFFFFFF. 
+"""
+    }
+]

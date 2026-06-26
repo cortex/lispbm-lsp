@@ -3,7 +3,7 @@ use std::{collections::HashMap, path};
 use serde::{Deserialize, Serialize};
 use tree_sitter::{QueryCursor, StreamingIterator};
 
-use crate::entry;
+use crate::builtin;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Definition {
@@ -20,7 +20,7 @@ pub enum SourceInfo {
         len: u32,
     },
     Builtin {
-        name: entry::Builtin,
+        name: builtin::Builtin,
     },
     Collection {
         path: path::PathBuf,
@@ -33,27 +33,6 @@ impl SourceInfo {
             SourceInfo::Source { file, .. } => file.display().to_string(),
             SourceInfo::Builtin { name } => name.to_string(),
             SourceInfo::Collection { path } => path.display().to_string(),
-        }
-    }
-
-    pub fn is_file(&self, file: &path::PathBuf) -> bool {
-        match self {
-            SourceInfo::Source { file: f, .. } => f == file,
-            _ => false,
-        }
-    }
-
-    pub fn is_builtin(&self, name: &entry::Builtin) -> bool {
-        match self {
-            SourceInfo::Builtin { name: n } => n == name,
-            _ => false,
-        }
-    }
-
-    pub fn is_collection(&self, path: &path::PathBuf) -> bool {
-        match self {
-            SourceInfo::Collection { path: p } => p == path,
-            _ => false,
         }
     }
 }
