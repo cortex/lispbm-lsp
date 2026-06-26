@@ -1,0 +1,134 @@
+definitions = [
+    {
+        name = "hide-trapped-error",
+        comment = """
+The default behavior is to print error messages even if the error is trapped. Trapped errors can be hidden by calling this function at the beginning of a program. 
+"""
+    },
+    {
+        name = "show-trapped-errors",
+        comment = """
+If you have hidden trapped errors they can be toggled back to being showed again using this function. 
+"""
+    },
+    {
+        name = "env-get",
+        comment = """
+env-get can be used to reify, turn into value, parts of the global environment. The global environment is stored as a hashtable and an index into this hashtable is used to extract the bindings stored under that hash. 
+"""
+    },
+    {
+        name = "env-set",
+        comment = """
+env-set destructively sets an entry in the global environment hashtable. 
+"""
+    },
+    {
+        name = "env-drop",
+        comment = """
+drop a binding from an environment. 
+"""
+    },
+    {
+        name = "local-env-get",
+        comment = """
+local-env-get can be used to reify, turn into value, the local environment. 
+"""
+    },
+    {
+        name = "global-env-size",
+        comment = """
+Get the size (in number of bindings) of the global env. 
+"""
+    },
+    {
+        name = "set-gc-stack-size",
+        comment = """
+With set-gc-stack-size you can change the size of the stack used for heap traversal by the garbage collector. 
+"""
+    },
+    {
+        name = "is-always-gc",
+        comment = """
+The is-always-gc predicate is true if LBM is built with the LBM_ALWAYS_GC debug flag. 
+"""
+    },
+    {
+        name = "mem-num-free",
+        comment = """
+mem-num-free returns the number of free words in the LBM memory. This is the memory where arrays and strings are stored. 
+"""
+    },
+    {
+        name = "mem-longest-free",
+        comment = """
+mem-longest-free returns the length in words of the longest consecutive sequence of free words in the LBM memory. 
+"""
+    },
+    {
+        name = "mem-size",
+        comment = """
+mem-size returns the size of the LBM memory. 
+"""
+    },
+    {
+        name = "lbm-heap-state",
+        comment = """
+lbm-heap-state can be used to query information about heap usage. 
+"""
+    },
+    {
+        name = "set-eval-quota",
+        comment = """
+set-eval-quota sets the number of evaluation steps that is given to each context when given turn to execute by the round-robin scheduler. 
+"""
+    },
+    {
+        name = "symtab-size",
+        comment = """
+symtab-size returns the size of the symbol table in bytes. 
+"""
+    },
+    {
+        name = "symtab-size-flash",
+        comment = """
+symtab-size-flash returns the size in bytes of the portion of the symbol table that is stored in flash. 
+"""
+    },
+    {
+        name = "symtab-size-names",
+        comment = """
+symtab-size-names returns the size in bytes of the string names stored in the symbol table. 
+"""
+    },
+    {
+        name = "symtab-size-names-flash",
+        comment = """
+symtab-size-names returns the size in bytes of the string names stored in the symbol table in flash. 
+"""
+    },
+    {
+        name = "mailbox-get",
+        comment = """
+mailbox-get returns the mailbox contents of a thread as a list. The form of a mailbox-get expression is (mailbox-get pid) . Note that mailbox-get does NOT empty the mailbox. 
+"""
+    },
+    {
+        name = "lbm-version",
+        comment = """
+lbm-version returns the version of the lbm runtime system. 
+"""
+    },
+    {
+        name = "is-64bit",
+        comment = """
+is-64bit returns true if a 64bit version of lbm is running. 
+"""
+    },
+    {
+        name = "word-size",
+        comment = """
+word-size returns 4 on 32bit LBM and 8 on 64bits. 
+"""
+    }
+]

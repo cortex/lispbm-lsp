@@ -4,7 +4,10 @@ use serde::{Deserialize, Serialize};
 use tracing::{error, info};
 use tree_sitter::{QueryCursor, StreamingIterator};
 
-use crate::definitions::{self, SourceInfo};
+use crate::{
+    builtin,
+    definitions::{self, SourceInfo},
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EntryFile {
@@ -17,7 +20,7 @@ pub struct EntryFile {
 pub enum Extension {
     #[serde(rename = "path")]
     Collection(path::PathBuf),
-    Builtin(Builtin),
+    Builtin(builtin::Builtin),
     #[serde(rename = "definitions")]
     Inline(Vec<Definition>),
 }
@@ -62,22 +65,6 @@ impl DefinitionFile {
                 )
             })
             .collect()
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Builtin {
-    Core,
-    Std,
-}
-
-impl std::fmt::Display for Builtin {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Builtin::Core => write!(f, "core"),
-            Builtin::Std => write!(f, "std"),
-        }
     }
 }
 
@@ -151,25 +138,15 @@ impl EntryFile {
                     let path = self.entry_point.clone();
                     paths.push(path);
                 }
-                _ => {}
+                Extension::Builtin(builtin) => {
+                    let id = builtin.to_string();
+                    info!("[Entry] Loaded extension builtin: {:?}", id);
+                    paths.push(path::PathBuf::from(id));
+                }
             }
         }
 
         Ok(paths)
-    }
-
-    pub fn get_ext_builtins(&self) -> Vec<Builtin> {
-        let mut builtins = vec![];
-        for ext in &self.extension {
-            match ext {
-                Extension::Builtin(builtin) => {
-                    builtins.push(builtin.clone());
-                }
-                _ => {}
-            }
-        }
-
-        builtins
     }
 
     pub fn get_ext_inline_definitions(&self) -> HashMap<String, Vec<definitions::Definition>> {
@@ -236,11 +213,8 @@ impl EntryFile {
                     }
                 }
                 Extension::Builtin(builtin) => {
-                    let definitions: Vec<Definition> = match builtin {
-                        Builtin::Core => vec![],
-                        Builtin::Std => vec![],
-                    };
-                    for def in definitions {
+                    let def_file = builtin.get_def_file();
+                    for def in def_file.definitions {
                         let (name, comment) = match def {
                             Definition::Full { name, comment } => (name, comment),
                             Definition::Inline(name) => (name, None),
@@ -288,7 +262,7 @@ mod tests {
             path = "../../helpers.toml"
 
             [[extension]]
-            builtin = "core"
+            builtin = "lbm"
 
             [[extension]]
             definitions = [
@@ -308,7 +282,7 @@ mod tests {
             entry_point: path::PathBuf::from("./main.lisp"),
             extension: vec![
                 Extension::Collection(path::PathBuf::from("../../helpers.toml")),
-                Extension::Builtin(Builtin::Core),
+                Extension::Builtin(builtin::Builtin::Lbm),
                 Extension::Inline(vec![
                     Definition::Full {
                         name: "hello".to_string(),

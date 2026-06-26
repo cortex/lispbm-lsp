@@ -1,0 +1,32 @@
+definitions = [
+    {
+        name = "correlate",
+        comment = """
+correlate computes the cross-correlation of two real-valued signals. The form is (correlate s1 s2) or (correlate s1 s2 'little-endian) . Both s1 and s2 must be byte arrays containing 32-bit floats. Returns a new byte array of floats with length (+ (len s1) (len s2) -1) , where lengths are measured in number of floats. Cross-correlation measures the similarity between two signals as a function of the time-lag applied to one of them. The optional 'little-endian argument specifies the byte order of the float data in the input arrays. If omitted the data is assumed to be big-endian. On most embedded systems floats are stored in little-endian format, so 'little-endian should typically be passed. 
+"""
+    },
+    {
+        name = "convolve",
+        comment = """
+convolve computes the convolution of a signal with a filter kernel. The form is (convolve signal filter) or (convolve signal filter 'little-endian) . Both arguments must be byte arrays containing 32-bit floats. Returns a new byte array of floats with length (+ (len signal) (len filter) -1) , where lengths are measured in number of floats. Convolution is commonly used for applying FIR filters to signals. The optional 'little-endian argument specifies the byte order of the float data in the input arrays. If omitted the data is assumed to be big-endian. 
+"""
+    },
+    {
+        name = "complex-correlate",
+        comment = """
+complex-correlate computes the cross-correlation of two complex-valued signals. The form is (complex-correlate s1-re s1-im s2-re s2-im) or with an optional 'little-endian as a fifth argument. All four arguments must be byte arrays of equal length containing 32-bit floats, representing the real and imaginary parts of the two signals. Returns a cons pair (output-re . output-im) of byte arrays. The correlation uses the conjugate of s2 , consistent with the standard definition of complex cross-correlation. The real and imaginary arrays of each signal must have the same length. The optional 'little-endian argument specifies the byte order of the float data.
+"""
+    },
+    {
+        name = "complex-convolve",
+        comment = """
+complex-convolve computes the convolution of two complex-valued signals. The form is (complex-convolve sig-re sig-im fil-re fil-im) or with an optional 'little-endian as a fifth argument. All four arguments must be byte arrays of equal length containing 32-bit floats, representing the real and imaginary parts of the signal and filter. Returns a cons pair (output-re . output-im) of byte arrays. The real and imaginary arrays of each input must have the same length. The optional 'little-endian argument specifies the byte order of the float data.
+"""
+    },
+    {
+        name = "fft",
+        comment = """
+fft computes the Fast Fourier Transform of a signal. The form is (fft real-arr imag-arr) with optional additional arguments. Both real-arr and imag-arr must be byte arrays of equal size containing 32-bit floats, representing the real and imaginary parts of the input signal. Returns a cons pair (real-output . imag-output) of byte arrays. If the input length is not a power of two, the arrays are zero-padded to the next power of two before the transform is applied. The output length will therefore be at least as large as the input. Optional arguments: For a real-valued signal, set all values in imag-arr to zero. 
+"""
+    }
+]

@@ -1,0 +1,146 @@
+definitions = [
+    {
+        name = "disp-render",
+        comment = """
+An image is drawn onto a display using disp-render . The form of a disp-render expression is (disp-render image x y color-list) . 
+"""
+    },
+    {
+        name = "disp-render-jpg",
+        comment = """
+There is a renderer specifically for JPG images. If one is considering to use JPG for images, the images are most likely larger than what is easy to handle with image buffers. The disp-render-jpg decompresses a JPG in small chunks and outputs directly to the display. The form of a disp-render-jpg expression is (disp-render-jpg jpg-data x y) . 
+"""
+    },
+    {
+        name = "disp-clear",
+        comment = """
+Use disp-clear to clear the display 
+"""
+    },
+    {
+        name = "disp-reset",
+        comment = """
+Use disp-reset to reset the display 
+"""
+    },
+    {
+        name = "img-buffer",
+        comment = """
+Allocate an image buffer from lbm memory or from a compactable region. The form of an img-buffer expression is (img-buffer opt-dm format width height) . 
+"""
+    },
+    {
+        name = "img-buffer?",
+        comment = """
+Checks if the argument is likely to be an image buffer. 
+"""
+    },
+    {
+        name = "img-blit",
+        comment = """
+(img-blit dest src x y transparent ..option) Copy pixels from src to dest . x and y are coordinates in dest . Pixels colored transparent in src will be skipped transparent can be set to -1 to indicate no transparency 
+"""
+    },
+    {
+        name = "img-dims",
+        comment = """
+img-dims returns the width and height of an image. The form of an img-dims expression is (img-dims image)`. 
+"""
+    },
+    {
+        name = "img-arc",
+        comment = """
+Draw an arc into an image. The form of an img-arc expression is (img-arc image cx cy r ang-s ang-e color ..option) . <br> 
+"""
+    },
+    {
+        name = "img-circle",
+        comment = """
+Draw a circle into an image. The form of an img-circle expression is (img-circle image cx cy r color ..option) . <br> 
+"""
+    },
+    {
+        name = "img-circle-sector",
+        comment = """
+Draw a circle sector into an image. The form of an img-circle-sector expression is (img-circle-sector image cx cy r ang-s ang-e color ..option) . <br> 
+"""
+    },
+    {
+        name = "img-circle-segment",
+        comment = """
+Draw a circle segment into an image. The form of an img-circle-segment expression is (img-circle-segment image cx cy r ang-s ang-e color ..option) . <br> 
+"""
+    },
+    {
+        name = "img-clear",
+        comment = """
+
+"""
+    },
+    {
+        name = "img-color",
+        comment = """
+img-color is used to create more complex color objects for use together with disp-render. 
+"""
+    },
+    {
+        name = "img-color-set",
+        comment = """
+With img-color-set you can set properties of a color. The form of a img-color-set expression is (img-color-set color prop value) 
+"""
+    },
+    {
+        name = "img-color-get",
+        comment = """
+With img-color-get you can access properties of a color. The form of an img-color-get expression is (img-color-get color prop) 
+"""
+    },
+    {
+        name = "img-color-setpre",
+        comment = """
+Update a value in a precalculated gradient color. The form of an img-color-setpre expression is (img-color-setpre color pos color-val) . 
+"""
+    },
+    {
+        name = "img-color-getpre",
+        comment = """
+Get a value from a precalculated gradient color. The form of an img-color-getpre expression is (img-color-getpre color pos) . 
+"""
+    },
+    {
+        name = "img-line",
+        comment = """
+Draw a line into an image. The form of an img-line expression is (img-line image x1 y1 x2 y2 color ..option) . <br> 
+"""
+    },
+    {
+        name = "img-rectangle",
+        comment = """
+Draw a rectangle into an image. The form of an img-rectangle expression is (img-rectangle image x1 y1 w h color ..option) . <br> 
+"""
+    },
+    {
+        name = "img-setpix",
+        comment = """
+Draw a pixel into an image. The form of an img-setpix expression is (img-setpix image x y color) . 
+"""
+    },
+    {
+        name = "img-getpix",
+        comment = """
+Get a pixel value from an image. The form of an img-getpix expression is (img-getpix image x y) . 
+"""
+    },
+    {
+        name = "img-text",
+        comment = """
+Draw text into an image. The form of an img-text expression is (img-text image x1 y1 fg bg font) . 
+"""
+    },
+    {
+        name = "img-triangle",
+        comment = """
+Draw a triangle into an image. The form of an img-triangle expression is (img-triangle image x1 y1 x2 y2 x3 y3 color ..option) . <br> 
+"""
+    }
+]

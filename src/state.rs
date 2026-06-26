@@ -5,11 +5,12 @@ use std::{
 
 use derivative::Derivative;
 use tokio::sync;
-use tower_lsp_server::ls_types::{self, DiagnosticSeverity, MonikerKind::Import};
+use tower_lsp_server::ls_types::{self, DiagnosticSeverity};
 use tracing::{error, info, warn};
 use tree_sitter::{QueryCursor, StreamingIterator};
 
 use crate::{
+    builtin,
     definitions::{self, Definition},
     entry,
 };
@@ -531,10 +532,64 @@ impl State {
             .unwrap_or(&HashSet::new())
             .iter()
         {
-            let content = match tokio::fs::read_to_string(file).await {
-                Ok(c) => c,
-                Err(e) => {
-                    error!("Failed to read file {:?}: {}", file, e);
+            let ext = file
+                .as_ref()
+                .extension()
+                .and_then(|s| s.to_str())
+                .unwrap_or("");
+            let content = match ext {
+                "lisp" | "lsp" => match tokio::fs::read_to_string(file).await {
+                    Ok(c) => c,
+                    Err(e) => {
+                        error!("Failed to read file {:?}: {}", file, e);
+                        continue;
+                    }
+                },
+                "toml" => {
+                    let filename = file.as_ref().file_name().and_then(|s| s.to_str());
+                    match filename {
+                        Some("entry.toml") => match tokio::fs::read_to_string(file).await {
+                            Ok(c) => c,
+                            Err(e) => {
+                                error!("Failed to read entry file {:?}: {}", file, e);
+                                continue;
+                            }
+                        },
+                        Some(s) if s.ends_with(".builtin.ext.toml") => {
+                            match builtin::Builtin::from_filename(s) {
+                                Some(builtin) => {
+                                    info!("[Indexing] Loading builtin definition file {:?}", file);
+                                    builtin.get_ref().to_string()
+                                }
+                                None => {
+                                    warn!(
+                                        "[Indexing] Unsupported builtin definition file {:?}",
+                                        file
+                                    );
+                                    continue;
+                                }
+                            }
+                        }
+                        _ => match tokio::fs::read_to_string(file).await {
+                            Ok(c) => {
+                                info!("[Indexing] Loading definition collection file {:?}", file);
+                                c
+                            }
+                            Err(e) => {
+                                error!(
+                                    "Failed to read definition collection file {:?}: {}",
+                                    file, e
+                                );
+                                continue;
+                            }
+                        },
+                    }
+                }
+                _ => {
+                    warn!(
+                        "[Indexing] Unsupported file extension {:?} for file {:?}",
+                        ext, file
+                    );
                     continue;
                 }
             };
@@ -555,7 +610,7 @@ impl State {
                     )
                     .unwrap();
                     info!(
-                        "Indexed file {:?} for entry {:?} with {} definitions",
+                        "[Indexing] Indexed file {:?} for entry {:?} with {} definitions",
                         &file,
                         id.0.file_name().unwrap().display(),
                         defs.len()
@@ -585,6 +640,11 @@ impl State {
                                 }
                             };
                             let ext_imports = entry.get_ext_inline_definitions();
+                            info!(
+                                "[Indexing] Indexed entry file {:?} with {} definitions",
+                                &file,
+                                ext_imports.len()
+                            );
                             self.files
                                 .entry(file.clone())
                                 .and_modify(|f| f.definitions = ext_imports.clone())
@@ -609,6 +669,12 @@ impl State {
                                 }
                             };
                             let defs = def_file.get_definitions(file.as_ref());
+
+                            info!(
+                                "[Indexing] Indexed definition collection file {:?} with {} definitions",
+                                &file,
+                                defs.len()
+                            );
 
                             self.files
                                 .entry(file.clone())
