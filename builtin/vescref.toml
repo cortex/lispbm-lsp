@@ -1,0 +1,2390 @@
+definitions = [
+    {
+        name = "print",
+        comment = """
+(print arg1 ... argN) Print to the VESC Tool Lisp console. Example: (print "Hello World") > "Hello World" Should work for all types. If multiple arguments are provided, each one will be printed on a separate line.
+"""
+    },
+    {
+        name = "puts",
+        comment = """
+(puts str) Similar to print , but only takes one string as an argument and prints it without quotes. The string extensions can be used to format the output. Note: This extension can print longer strings than print . print will trim any output over 256 bytes, while this extension only trims strings over 400 bytes. Example: (puts "Hello World") > Hello World
+"""
+    },
+    {
+        name = "set-print-prefix",
+        comment = """
+(set-print-prefix str) Adds a prefix to prints that are sent to the repl in VESC Tool. Useful when multiple devices print to the repl over CAN at the same time for determining which print comes from which device. The prefix can't be longer than 50 bytes (including the null byte), and str will be trimmed if longer. The value is remembered until the next power cycle. Note: This is applied to all text sent to the repl, not just text created by calling print or puts . Example: (set-print-prefix "dev-1| ") (puts "This message has\na clear origin!") which outputs dev-1| This message has dev-1| a clear origin!
+"""
+    },
+    {
+        name = "set-fw-name",
+        comment = """
+(set-fw-name str) Set (or override if already set in the firmware) firmware name. The firmware name is printed in the CAN-list in VESC Tool when it is set. It can also be used by packages to determine if they are compatible with the connected hardware.
+"""
+    },
+    {
+        name = "timeout-reset",
+        comment = """
+(timeout-reset) Reset the timeout that stops the motor. This has to be run on at least every second to keep the motor running. The timeout time can be configured in App Settings->General. The Motor Set Commands will also reset the timeout when they are called.
+"""
+    },
+    {
+        name = "get-ppm",
+        comment = """
+(get-ppm) Read the decoded value on the PPM input, range -1.0 to 1.0. If the PPM-decoder is not running it will be initialized and the PPM-pin will be reconfigured, so make sure that nothing else is using that pin. Example: (print (str-from-n (get-ppm) "PPM Value: %.2f")) Note that control type can be set to Off in the PPM app to get the input without running the motor automatically, which is useful when running the motor from lisp.
+"""
+    },
+    {
+        name = "get-ppm-age",
+        comment = """
+(get-ppm-age) Get the age of the last PPM update in seconds. Can be used to determine if there is any valid PPM-signal.
+"""
+    },
+    {
+        name = "set-servo",
+        comment = """
+(set-servo value) Set servo output to value. Range 0 to 1. Note that the servo output has to be enabled in App Settings -> General.
+"""
+    },
+    {
+        name = "get-vin",
+        comment = """
+(get-vin) Get input voltage.
+"""
+    },
+    {
+        name = "select-motor",
+        comment = """
+(select-motor motor) Select which motor to control on dual-motor hardware. Options are 1 for motor 1 and 2 for motor 2.
+"""
+    },
+    {
+        name = "get-selected-motor",
+        comment = """
+(get-selected-motor) Get currently selected motor on dual motor hardware.
+"""
+    },
+    {
+        name = "get-bms-val",
+        comment = """
+(get-bms-val val optValArg) Get value from BMS. Examples: (get-bms-val 'bms-v-tot) ; Total voltage (get-bms-val 'bms-v-charge) ; Charge input voltage (get-bms-val 'bms-i-in-ic) ; Measured current (negative means charging) (get-bms-val 'bms-ah-cnt) ; Amp hour counter (get-bms-val 'bms-wh-cnt) ; Watt hour counter (get-bms-val 'bms-cell-num) ; Number of cells in series (get-bms-val 'bms-v-cell 2) ; Cell 3 voltage (index starts from 0) (get-bms-val 'bms-bal-state 2) ; Cell 3 balancing state. 0: not balancing, 1: balancing (get-bms-val 'bms-temp-adc-num) ; Temperature sensor count (get-bms-val 'bms-temps-adc 2) ; Get sensor 3 temperature (index starts from 0) (get-bms-val 'bms-temp-ic) ; Balance IC temperature (get-bms-val 'bms-temp-hum) ; Humidity sensor temperature (get-bms-val 'bms-hum) ; Humidity (get-bms-val 'bms-pres) ; Pressure in PA (Added in 6.05) (get-bms-val 'bms-temp-cell-max) ; Maximum cell temperature (get-bms-val 'bms-v-cell-min) ; Minimum cell voltage (added in 6.06) (get-bms-val 'bms-v-cell-max) ; Maximum cell voltage (added in 6.06) (get-bms-val 'bms-soc) ; State of charge (0.0 to 1.0) (get-bms-val 'bms-soh) ; State of health (0.0 to 1.0) (get-bms-val 'bms-can-id) ; CAN ID of BMS (get-bms-val 'bms-ah-cnt-chg-total) ; Total ah charged (get-bms-val 'bms-wh-cnt-chg-total) ; Total wh charged (get-bms-val 'bms-ah-cnt-dis-total) ; Total ah discharged (get-bms-val 'bms-wh-cnt-dis-total) ; Total wh discharged (get-bms-val 'bms-msg-age) ; Age of last message from BMS in seconds (get-bms-val 'bms-chg-allowed) ; Charging allowed (Added in 6.05, Express only) (get-bms-val 'bms-data-version) ; Data version (added in 6.06) (get-bms-val 'bms-status) ; Status string (added in 6.06) Note In firmware 6.06 the following temperature sensor convention was introduced for bms-temps-adc. So when using (get-bms-val 'bms-temps-adc 2) the maximum cell temperature should be returned. If a temperature returns less than -280 degC that reading is not applicable on that BMS. Keep in mind that it will take some time before all BMSes follow this convention after the 6.06 release. (get-bms-val 'bms-data-version) should return 1 if this convention is used.
+"""
+    },
+    {
+        name = "set-bms-val",
+        comment = """
+(set-bms-val val optValArg new-value) This lets you set BMS-values so that VESC Tool and the BMS limits can see and use them. The same values as described in get-bms-val can be updated, but with an argument at the end with what the value should be set to. This is useful if you want to implement communication with a custom BMS and have it show up in VESC Tool. Example: (set-bms-val 'bms-cell-num 12) ; It is a 12s pack (set-bms-val 'bms-v-cell 2 3.92) ; Set cell 2 voltage to 3.92V
+"""
+    },
+    {
+        name = "send-bms-can",
+        comment = """
+(send-bms-can) Send BMS-values on CAN-bus. This his useful if a custom BMS-driver is implemented using set-bms-val in order to make devices on the CAN-bus aware of the BMS-state using the VESC protocol.
+"""
+    },
+    {
+        name = "set-bms-chg-allowed",
+        comment = """
+(set-bms-chg-allowed allow) Enable or disable charging. 1 means enable and 0 means disable.
+"""
+    },
+    {
+        name = "bms-force-balance",
+        comment = """
+(bms-force-balance balance) Start or stop balancing. 1 means start and 0 means stop.
+"""
+    },
+    {
+        name = "bms-zero-offset",
+        comment = """
+(bms-zero-offset) Zero current measurement offset on BMS. Has to be done while no current (or charge-current on charge-only BMS) is flowing. Will be sent to every BMS on the CAN-bus.
+"""
+    },
+    {
+        name = "bms-st",
+        comment = """
+(bms-st can-id) Run self-test on BMS with can-id. Returns the following list on success, otherwise timeout: ( 1 ; Balance IC OK 1 ; Balamce connection check OK 8 ; Cell num (8 Cells) (1 3.691400f32 3.561700f32) ; Cell 1 OK, V_BAL, V_NO_BAL (1 3.687200f32 3.367500f32) ; Cell 2 OK, V_BAL, V_NO_BAL (1 3.687500f32 3.377500f32) ; Cell 3 OK, V_BAL, V_NO_BAL (1 3.688900f32 3.389400f32) ; Cell 4 OK, V_BAL, V_NO_BAL (1 3.690100f32 3.401900f32) ; Cell 5 OK, V_BAL, V_NO_BAL (1 3.688800f32 3.413800f32) ; Cell 6 OK, V_BAL, V_NO_BAL (1 3.689000f32 3.424600f32) ; Cell 7 OK, V_BAL, V_NO_BAL (1 3.688900f32 3.433300f32) ; Cell 8 OK, V_BAL, V_NO_BAL )
+"""
+    },
+    {
+        name = "get-adc",
+        comment = """
+(get-adc ch) Get ADC voltage on channel ch (0, 1, 2 or 3). The channels are the following: Channel 0: ADC1 on the COMM-port Channel 1: ADC2 on the COMM-port Channel 2: ADC3 on the COMM-port. Note that some hardware does not have this channel - then the voltage of ADC1 is returned instead. Channel 3: This is the ADC-channel that the motor temperature sensor goes to. Note: if you want to use this channel for something else you have to disable the motor temperature sensor in General -> Advanced. Otherwise the input might generate overtemperature faults. Channel 4+: Some hardware has additional ADC-channels which also can be read with this function. If they are missing the voltage on ADC1 is returned instead. Channel 20 (FW6.06+): Sin/Cos encoder SIN channel Channel 21 (FW6.06+): Sin/Cos encoder COS channel
+"""
+    },
+    {
+        name = "override-temp-motor",
+        comment = """
+(override-temp-motor temp) Override motor temperature. This can be used to implement custom motor temperature sensors if the sensor you have is not supported. Note: Motor Temperature Sensor Type has to be set to Disabled in General -> Advanced for the override to work.
+"""
+    },
+    {
+        name = "get-adc-decoded",
+        comment = """
+(get-adc-decoded ch) Get decoded ADC value on channel ch (0 or 1). Decoded means that the voltage is mapped to the range 0 to 1 according to the configuration in the ADC app. Note that the ADC app must be running for this function to work. No throttle curve is applied to this value, but you can use the throttle-curve function to apply one if desired.
+"""
+    },
+    {
+        name = "systime",
+        comment = """
+(systime) Get system time in ticks since boot.
+"""
+    },
+    {
+        name = "secs-since",
+        comment = """
+(secs-since timestamp) Get seconds elapsed since systime timestamp.
+"""
+    },
+    {
+        name = "set-aux",
+        comment = """
+(set-aux ch state) Set AUX output ch (1 or 2) to state. Example: (set-aux 1 1) ; Set AUX1 to ON. Note: The AUX output mode must be set to Unused in Motor Settings->General->Advanced. Otherwise the firmware will change the AUX state directly after it is set using this function.
+"""
+    },
+    {
+        name = "get-imu-rpy",
+        comment = """
+(get-imu-rpy) Get roll, pitch and yaw from the IMU in radians. The function (ix list ind) can be used to get an element from the list. Example: (ix (get-imu-rpy) 0) ; Get roll (index 0)
+"""
+    },
+    {
+        name = "get-imu-quat",
+        comment = """
+(get-imu-quat) Get a list of quaternions from the IMU (q0, q1, q2 and q3).
+"""
+    },
+    {
+        name = "get-imu-acc",
+        comment = """
+(get-imu-acc) Get a list of the x, y and z acceleration from the IMU in G.
+"""
+    },
+    {
+        name = "get-imu-gyro",
+        comment = """
+(get-imu-gyro) Get a list of the x, y and z angular rate from the IMU in degrees/s.
+"""
+    },
+    {
+        name = "get-imu-mag",
+        comment = """
+(get-imu-mag) Get a list of the x, y and z magnetic field strength from the IMU in uT. Note that most IMUs do not have a magnetometer.
+"""
+    },
+    {
+        name = "get-imu-acc-derot",
+        comment = """
+Same as get-imu-acc, but derotates the result first. This means that the acceleration will be relative to the horizon and not the IMU chip.
+"""
+    },
+    {
+        name = "get-imu-gyro-derot",
+        comment = """
+Same as get-imu-gyro, but derotates the result first. This means that the angular rates will be relative to the horizon and not the IMU chip.
+"""
+    },
+    {
+        name = "send-data",
+        comment = """
+(send-data dataList optInterface optCanId) Send a list of custom app data on the commands-interface of the type COMM_CUSTOM_APP_DATA. This can be read from a Qml script in VESC Tool for example or from another node on the CAN-bus. Example of sending the numbers 1, 2, 3 and 4: (send-data (list 1 2 3 4)) dataList can be a list or a byte array . The optional argument optInterface (introduced in FW 6.05) can be used to specify which interface to use and the optional argument optCanId can be used to specify which CAN-device to send the message to when using the CAN interface. The available interfaces are:
+"""
+    },
+    {
+        name = "recv-data",
+        comment = """
+(recv-data optTimeout) Block current thread until data from VESC Tool arrives. The optional argument optTimeout can be used to specify a timeout in seconds. If a timeout occurs the symbol timeout will be returned, otherwise a byte array with the data will arrive. Usage example: (print (recv-data)) > [1 2 3]
+"""
+    },
+    {
+        name = "sleep",
+        comment = """
+(sleep seconds) Sleep for seconds seconds. Example: (sleep 0.05) ; Sleep for 0.05 seconds (50 ms)
+"""
+    },
+    {
+        name = "get-remote-state",
+        comment = """
+(get-remote-state) Get button and joystick state of connected remote. Note that a remote app such as the VESC remote or nunchuk must be configured and running for this to work. Returns the following list: (js-y js-x bt-c bt-z is-rev update-age) ; Where ; js-y : Joystick Y axis, range -1.0 to 1.0 ; js-x : Joystick X axis, range -1.0 to 1.0 ; bt-c : C button pressed state, 0 or 1 ; bt-z : Z button pressed state, 0 or 1 ; is-rev : Reverse active, 0 or 1 ; update-age : Age of last update from the remote in seconds
+"""
+    },
+    {
+        name = "sysinfo",
+        comment = """
+(sysinfo param) Read system info parameter param. Example: (sysinfo 'hw-name) ; Hardware name, e.g 60 (sysinfo 'fw-ver) ; Firmware version as list (Major Minor BetaNum) (sysinfo 'has-phase-filters) ; t if hardware has phase filters. ESC only. (sysinfo 'uuid) ; STM32 UUID. ESC only. (sysinfo 'runtime) ; Total runtime in seconds. ESC only. (sysinfo 'odometer) ; Total odometer in meters. ESC only. Added in 6.06. (sysinfo 'git-branch) ; Git branch name. (sysinfo 'git-hash) ; Git hash of current commit. (sysinfo 'compiler) ; GCC version, e.g. 7.3.1. ESC only. (sysinfo 'hw-type) ; Hardware type, e.g. hw-express. Added in 6.02. (sysinfo 'part-running) ; Running partition name. Express only. (sysinfo 'cpu-freq) ; CPU frequency in MHz. Express only.
+"""
+    },
+    {
+        name = "stats",
+        comment = """
+(stats param) Get statistics about the selected motor since boot (or since stats-reset). The following example shows which stats are available: (stats 'stat-speed-avg) ; Average speed in m/s (stats 'stat-speed-max) ; Maximum speed in m/s (stats 'stat-power-avg) ; Average power in W (stats 'stat-power-max) ; Maximum power in W (stats 'stat-current-avg) ; Average current in A (stats 'stat-current-max) ; Maximum current in A (stats 'stat-temp-mosfet-avg) ; Average MOSFET temp in degC (stats 'stat-temp-mosfet-max) ; Maximum MOSFET temp in degC (stats 'stat-temp-motor-avg) ; Average motor temp in degC (stats 'stat-temp-motor-max) ; Maximum motor temp in degC (stats 'stat-count-time) ; Time since start of stat collection in seconds
+"""
+    },
+    {
+        name = "set-odometer",
+        comment = """
+(set-odometer meters) Set persistent odometer counter to meters.
+"""
+    },
+    {
+        name = "stats-reset",
+        comment = """
+(stats-reset) Reset stat counters to 0.
+"""
+    },
+    {
+        name = "crc16",
+        comment = """
+(crc16 array optLen) Calculate the 16-bit crc of array. optLen is an optional argument for how many elements to include, if it is left out the entire array will be used. The crc uses the polynomial 0x11021 and initial value 0, which is the same as the VESC packets use. Added in FW 6.02.
+"""
+    },
+    {
+        name = "crc32",
+        comment = """
+(crc32 array init optLen) Calculate the 32-bit crc of array. optLen is an optional argument for how many elements to include, if it is left out the entire array will be used. The crc uses the polynomial 0x4C11DB7 (ethernet) and initial value init.
+"""
+    },
+    {
+        name = "main-init-done",
+        comment = """
+(main-init-done) Returns true when the main-function is done with all initialization.
+"""
+    },
+    {
+        name = "shutdown-hold",
+        comment = """
+(shutdown-hold hold) Hold shutdown. When hold is true hardware shutdown will be delayed until hold is set to false again. Can be used when catching a shutdown-event if more time is needed for cleanup.
+"""
+    },
+    {
+        name = "reboot",
+        comment = """
+(reboot) Reboot CPU. Required on the express when e.g. changing wifi-settings.
+"""
+    },
+    {
+        name = "override-speed",
+        comment = """
+(overide-speed ovr speed) Override speed reported to VESC Tool (and to other extensions). The argument speed is the speed to override with in meters per second and the argument ovr is set to 1 for overriding the speed and to 0 for reporting the speed as before. Example: ; Override speed with 3.6 km/h (overide-speed 1 (/ 12.0 3.6)) ; Do not override speed anymore (overide-speed 0 0)
+"""
+    },
+    {
+        name = "app-adc-detach",
+        comment = """
+(app-adc-detach mode state) ; Where ; mode : Select periperial to detach from APP ; - 0 All peripherial attached (no second argument) ; - 1 ADC1/2 ; - 2 Buttons ; - 3 ADC1/2 + Buttons ; state : Only used when mode is not 0. State 1, 2 or 3 detaches the peripheral and ; state 0 attaches peripheral. For the ADC, 1 means detach both ADCs, 2 means ; detach ADC1 only and 3 means detach ADC2 only. For the buttons state ; 1, 2 and 3 mean the same thing, namely detach. Detaches a peripherial from the APP ADC Note: Since firmware 6.05 the ADC-app will no longer reset the timeout by itself when detached. That means that the override-commands have to be sent at a rate higher than the timeout for the output to stay enabled. This is a safety feature that prevents the motor from running after the timeout time if e.g. your script crashes.
+"""
+    },
+    {
+        name = "app-adc-override",
+        comment = """
+(app-adc-override mode value) ; Where ; mode : Select peripheral to override ; - 0 ADC1 ; - 1 ADC2 ; - 2 Reverse button ; - 3 Cruise control button ; value : 0.0 to 3.3 (button pressed is > 0.0) ; Note that throttle mapping also is applied to the override value. Sets the override value
+"""
+    },
+    {
+        name = "app-adc-range-ok",
+        comment = """
+(app-adc-range-ok) Returns true when the throttle voltage is within range and false (nil) otherwise.
+"""
+    },
+    {
+        name = "app-ppm-detach",
+        comment = """
+(app-ppm-detach state) Detaches the decoded ppm signal from APP PPM. 1 means detach, 0 means attach.
+"""
+    },
+    {
+        name = "app-ppm-override",
+        comment = """
+(app-ppm-override value) Sets the override value. Range -1.0 to 1.0.
+"""
+    },
+    {
+        name = "set-remote-state",
+        comment = """
+(set-remote-state js-y js-x bt-c bt-z is-rev) ; Where ; js-y : Joystick Y axis, range -1.0 to 1.0, used for throttle position ; js-x : Joystick X axis, range -1.0 to 1.0, unused by the app ; bt-c : C button pressed state, 0 or 1, used for cruise control ; bt-z : Z button pressed state, 0 or 1, unused by the app ; is-rev : Reverse active, 0 or 1, reverse mode active Send input to the VESC Remote app. Unlike the ADC and PPM apps, input can be sent to this app at any time without detaching it and it will be treated the same as a packet from a VESC Remote. That means the timeout as well as all VESC Remote settings will be used.
+"""
+    },
+    {
+        name = "app-disable-output",
+        comment = """
+(app-disable-output ms) Disable app output for ms milliseconds. 0 means enable now and -1 means disable forever. This can be used to override the control of apps temporarily.
+"""
+    },
+    {
+        name = "app-is-output-disabled",
+        comment = """
+(app-is-output-disabled) Check if app output is disabled. VESC Tool will disable app output during some detection routines, so when running a custom control script it might be useful to check this and disable the output when this value is true.
+"""
+    },
+    {
+        name = "app-pas-get-rpm",
+        comment = """
+(app-pas-get-rpm) Returns the pedal RPM measured by the PAS-app. If you want to implement your own PAS-control based on this RPM you can use app-disable-output to disable the output of the PAS-app.
+"""
+    },
+    {
+        name = "set-current",
+        comment = """
+(set-current current optOffDelay) Set motor current in amperes. The optional optOffDelay argument (in seconds) will delay turning off the modulation when setting 0 current. This is useful when running e.g. a control loop that will end up setting 0 current in some circumstances when turning off the modulation would make the control less smooth. The delay value should be longer than the rate at which the control loop runs.
+"""
+    },
+    {
+        name = "set-current-rel",
+        comment = """
+(set-current-rel current optOffDelay) Set motor current relative to the maximum current. Range -1 to 1. For example, if the maximum current is set to 50A, (set-current-rel 0.5) will set the current to 25A. See set-current for details on what the optional argument optOffDelay does.
+"""
+    },
+    {
+        name = "set-duty",
+        comment = """
+(set-duty dutycycle) Set duty cycle. Range -1.0 to 1.0.
+"""
+    },
+    {
+        name = "set-brake",
+        comment = """
+(set-brake current) Set braking current.
+"""
+    },
+    {
+        name = "set-brake-rel",
+        comment = """
+(set-brake-rel current) Set braking current relative to the maximum current, range 0.0 to 1.0.
+"""
+    },
+    {
+        name = "set-handbrake",
+        comment = """
+(set-handbrake current) Set handbrake current. This sets an open loop current that allows to hold the motor still even at 0 speed at the cost of efficient.
+"""
+    },
+    {
+        name = "set-handbrake-rel",
+        comment = """
+(set-handbrake-rel current) Same as set-handbrake, but with a current relative to the maximum current in the range 0.0 to 1.0.
+"""
+    },
+    {
+        name = "set-rpm",
+        comment = """
+(set-rpm rpm) Set RPM speed control.
+"""
+    },
+    {
+        name = "set-pos",
+        comment = """
+(set-pos pos) Position control. Set motor position in degrees, range 0.0 to 360.0.
+"""
+    },
+    {
+        name = "foc-openloop",
+        comment = """
+(foc-openloop current rpm) Run FOC in open loop. Useful to test thermal properties of motors and power stages.
+"""
+    },
+    {
+        name = "foc-openloop-phase",
+        comment = """
+(foc-openloop-phase current phase) Run FOC in open loop in phase mode. Phase is the electrical position of the openloop-vector in degrees, range 0.0 to 360.0.
+"""
+    },
+    {
+        name = "set-kill-sw",
+        comment = """
+(set-kill-sw state) Set kill switch state. When state is set to 1 the motor is disabled and optionally braking if timeout_brake_current is greater than 0. The kill switch overrides all other inputs and can be used as an emergency stop. The kill switch state here is applied as logic OR with the app settings kill switch input, so as long as any of them is active the motor will be disabled.
+"""
+    },
+    {
+        name = "foc-beep",
+        comment = """
+(foc-beep freq time voltage) Use the motor to play a beep sound at frequency freq for time seconds using voltage excitation voltage. The frequency can be set between 100 Hz and 7500 Hz.
+"""
+    },
+    {
+        name = "foc-play-tone",
+        comment = """
+(foc-play-tone channel freq voltage) Use the motor to play a tone at frequency freq with modulation voltage. Channel can be 0, 1, 2 or 3 and all channels can play tones simultaneously (polyphonic audio). Unlike foc-beep, foc-play-tone also works while the motor is running.
+"""
+    },
+    {
+        name = "foc-play-samples",
+        comment = """
+(foc-play-samples samples freq voltage) Use the motor to play sampled audio. Works while the motor is running. Samples is a byte-array with samples, where each sample has the range -128 to 127. Freq is the sampling frequency and voltage is the voltage amplitude the samples will be played at. The caller is responsible for making sure that the sample buffer stays valid until it is consumed. Internally this function has two buffers and when both buffers are full the function will block until a buffer is free. For smooth playback, it is important to keep feeding this function with buffers faster than it consumes the samples.
+"""
+    },
+    {
+        name = "foc-play-stop",
+        comment = """
+(foc-play-stop) Stop playing tones on all channels.
+"""
+    },
+    {
+        name = "get-current",
+        comment = """
+(get-current optFilter) Get motor current. Positive means that current is flowing into the motor and negative means that current is flowing out of the motor (regenerative braking).
+"""
+    },
+    {
+        name = "get-current-dir",
+        comment = """
+(get-current-dir) Get directional current. Positive for torque in the forward direction and negative for torque in the reverse direction.
+"""
+    },
+    {
+        name = "get-current-in",
+        comment = """
+(get-current-in optFilter)
+"""
+    },
+    {
+        name = "get-id",
+        comment = """
+(get-id optFilter) Get FOC d-axis current.
+"""
+    },
+    {
+        name = "get-iq",
+        comment = """
+(get-iq optFilter) Get FOC q-axis current.
+"""
+    },
+    {
+        name = "get-id-set",
+        comment = """
+(get-id-set) Get the set FOC d-axis current. This is the raw requested current.
+"""
+    },
+    {
+        name = "get-iq-set",
+        comment = """
+(get-iq-set) Get the set FOC q-axis current. This is the raw requested current.
+"""
+    },
+    {
+        name = "get-id-target",
+        comment = """
+(get-id-target) Get the FOC d-axis target current. This is sent to the current controller after applying all limits, MTPA, HFI and field weakening.
+"""
+    },
+    {
+        name = "get-iq-target",
+        comment = """
+(get-iq-target) Get the FOC q-axis target current. This is sent to the current controller after applying all limits, MTPA, HFI and field weakening.
+"""
+    },
+    {
+        name = "get-vd",
+        comment = """
+(get-vd optFilter) Get FOC d-axis voltage.
+"""
+    },
+    {
+        name = "get-vq",
+        comment = """
+(get-vq optFilter) Get FOC q-axis voltage.
+"""
+    },
+    {
+        name = "get-est-lambda",
+        comment = """
+(get-est-lambda) Get FOC estimated flux linkage in Weber. Requires that one of the observers with flux linkage tracking is used. Added in FW 6.02.
+"""
+    },
+    {
+        name = "get-est-res",
+        comment = """
+(get-est-res) Get FOC estimated motor resistance in Ohm. This value is only accurate when the RPM is low and current is high. Added in FW 6.02.
+"""
+    },
+    {
+        name = "get-est-ind",
+        comment = """
+(get-est-ind) Get FOC estimated motor inductance Henry. Only works while the first HFI is running (not 45 Deg and not Coupled HFI). Added in FW 6.02.
+"""
+    },
+    {
+        name = "get-hfi-res",
+        comment = """
+(get-hfi-res) Get HFI result. Only valid when using single or double pulse ambiguity resolution mode. Returns a list with the following valies: (i1 i2 diff) Where i1 is the delta current for the first voltage, i2 is the response current for the second voltage and diff is the difference between them. This can be used to determine how much ambiguity resolution current is required for a given motor.
+"""
+    },
+    {
+        name = "get-duty",
+        comment = """
+(get-duty) Get duty cycle. Range -1.0 to 1.0.
+"""
+    },
+    {
+        name = "get-duty-abs",
+        comment = """
+(get-duty-abs) Get filtered absolute duty cycle. This is the value used for field weakening. Range 0.0 to 1.0.
+"""
+    },
+    {
+        name = "get-rpm",
+        comment = """
+(get-rpm) Get motor ERPM. Negative values mean that the motor spins in the reverse direction.
+"""
+    },
+    {
+        name = "get-rpm-fast",
+        comment = """
+(get-rpm-fast) Same as get-rpm, but with less filtering. This give the RPM-estimation lower latency at the cost of more noise.
+"""
+    },
+    {
+        name = "get-rpm-faster",
+        comment = """
+(get-rpm-faster) Same as get-rpm-fast, but with even less filtering. This give the RPM-estimation even lower latency at the cost of even more noise.
+"""
+    },
+    {
+        name = "get-rpm-set",
+        comment = """
+(get-rpm-set) Get motor ERPM setpoint for PID speed controller.
+"""
+    },
+    {
+        name = "get-pos",
+        comment = """
+(get-pos) Get motor position. Returns the motor PID pos (taking into account the Position Angle Division)
+"""
+    },
+    {
+        name = "get-temp-fet",
+        comment = """
+(get-temp-fet optFet) Get MOSFET temperature. The argument optFet can be used to select senor 1 to 3. If it is left out or 0 the highest temperature is returned. If the hardware only has one sensor 0 is returned for sensors 1 to 3.
+"""
+    },
+    {
+        name = "get-temp-mot",
+        comment = """
+(get-temp-mot) Get motor temperature.
+"""
+    },
+    {
+        name = "get-temp-mot-res",
+        comment = """
+(get-temp-mot-res) Get the measured resistance of the motor temperature sensor.
+"""
+    },
+    {
+        name = "get-speed",
+        comment = """
+(get-speed) Get speed in meters per second. Requires that the number of motor poles, wheel diameter and gear ratio are set up correctly.
+"""
+    },
+    {
+        name = "get-speed-set",
+        comment = """
+(get-speed-set) Get PID speed setpoint in meters per second. Requires that the number of motor poles, wheel diameter and gear ratio are set up correctly.
+"""
+    },
+    {
+        name = "get-dist",
+        comment = """
+(get-dist) Get the distance traveled since start in meters. As with (get-speed) this requires that the number of motor poles, wheel diameter and gear ratio are set up correctly. When the motor spins forwards this counter counts up and when it spins backwards it counts down.
+"""
+    },
+    {
+        name = "get-dist-abs",
+        comment = """
+(get-dist-abs) Same as get-dist, but will count up when the motors spins in both directions.
+"""
+    },
+    {
+        name = "get-batt",
+        comment = """
+(get-batt) Get the battery level, range 0.0 to 1.0. Requires that the battery type and number of cells is set up correctly.
+"""
+    },
+    {
+        name = "get-fault",
+        comment = """
+(get-fault) Get fault code.
+"""
+    },
+    {
+        name = "get-ah",
+        comment = """
+(get-ah) Get the number of amp hours consumed since start.
+"""
+    },
+    {
+        name = "get-wh",
+        comment = """
+(get-wh) Get the number of watt hours consumed since start.
+"""
+    },
+    {
+        name = "get-ah-chg",
+        comment = """
+(get-ah-chg) Get the number of amp hours charged since start.
+"""
+    },
+    {
+        name = "get-wh-chg",
+        comment = """
+(get-wh-chg) Get the number of watt hours charged since start.
+"""
+    },
+    {
+        name = "get-encoder",
+        comment = """
+(get-encoder) Get angle from selected encoder in degrees.
+"""
+    },
+    {
+        name = "set-encoder",
+        comment = """
+(set-encoder degrees) Set the encoder position in degrees. This command only has an effect in the ABI and custom encoder modes. In ABI mode the encoder position is updated and the index is set to found. In custom encoder mode the encoder position is updated (unless a native library provides custom encoder support). When using an ABI-encoder this is useful if a position can be derived before the index pulse is found.
+"""
+    },
+    {
+        name = "get-encoder-error-rate",
+        comment = """
+(get-encoder-error-rate) Returns the error rate for the selected encoder, range 0.0 to 1.0. If the selected encoder does not provide any error rate -1.0 is returned. If the selected encoder has multiple error rates the highest one is returned.
+"""
+    },
+    {
+        name = "encoder-index-found",
+        comment = """
+(encoder-index-found) Returns 1 if the encoder index is found, 0 otherwise. For encoders without an index pulse or for PWM+ABI 1 is always returned.
+"""
+    },
+    {
+        name = "encoder-abi-state",
+        comment = """
+(encoder-abi-state) Returns the driver state of the ABI encoder. Can be used to determine how many counts the encoder has or if the error rate is unreasonably high, indicating that the signal is noisy. The following list is returned (index-found cnt-at-ind-last bad-pulses index-pulse-cnt) where index-found ; 1 if the index pulse has been received at least once, 0 otherwise cnt-at-ind-last ; Encoder counts the last time the index pulse was received bad-pulses ; Counts up every time a bad index pulse is received, resets at 6 index-pulse-cnt ; Index pulse counter
+"""
+    },
+    {
+        name = "pos-pid-now",
+        comment = """
+(pos-pid-now) Returns the current position of the PID-controller, including compensation for the angle division and offset. Unit: Degrees.
+"""
+    },
+    {
+        name = "pos-pid-set",
+        comment = """
+(pos-pid-set) Returns the set position of the PID-controller, including compensation for the angle division and offset. Unit: Degrees.
+"""
+    },
+    {
+        name = "pos-pid-error",
+        comment = """
+(pos-pid-error) Returns the difference between the current and the set PID position. Unit: Degrees.
+"""
+    },
+    {
+        name = "phase-motor",
+        comment = """
+(phase-motor) Returns the electrical position of the motor that is used for FOC now. Unit: Degrees.
+"""
+    },
+    {
+        name = "phase-encoder",
+        comment = """
+(phase-encoder) Returns the encoder position mapped to the electrical position of the motor. Unit: Degrees.
+"""
+    },
+    {
+        name = "phase-hall",
+        comment = """
+(phase-hall) Returns the hall sensor position of the motor. Unit: Degrees.
+"""
+    },
+    {
+        name = "phase-observer",
+        comment = """
+(phase-observer) Returns the FOC observer position. Unit: Degrees.
+"""
+    },
+    {
+        name = "observer-error",
+        comment = """
+(observer-error) Returns the difference between the observer position and the encoder position mapped to the electrical position of the motor. Unit: Degrees.
+"""
+    },
+    {
+        name = "phase-all",
+        comment = """
+(phase-all) Returns a list of phases and various phase errors, all sampled at the same time. This can be used for doing encoder error mapping and creating encoder error correction tables. Returns the folliwing list of values, all in degrees: ( phase_observer ; Observer phase phase_encoder ; Encoder phase, derived from current encoder settings phase_bemf ; Phase derived from the back-emf (only valid when undriven) pos_encoder ; Encoder angle reading in encoder reference frame err_observer_encoder ; Phase error between observer and encoder err_bemf_encoder ; Phase error between back-emf and encoder err_observer_bemf ; Phase error between observer and back-emf phase_hall ; Phase derived from the hall sensors (FW 7.00+) err_bemf_hall ; Phase error between back-emf and hall sensors (FW 7.00+) )
+"""
+    },
+    {
+        name = "enc-corr",
+        comment = """
+(enc-corr angle optCorr) Get (or set) encoder correction for angle. The angle is in the encoder reference frame and the correction is in the FOC reference frame. Returns the correction value for angle. The optional value optCorr can be used to update the correction value at angle, if it is left out only the old value will be returned. The correction is applied in the FOC reference frame, so it should be the error on the FOC motor phase that the encoder causes. Example: ; Prints encoder correction value for 10 degrees. Read only, nothing is chaged. (print (enc-corr 10)) ; Set encoder correction value for 10 degrees to -5 degrees. (enc-corr 10 -5)
+"""
+    },
+    {
+        name = "enc-corr-en",
+        comment = """
+(enc-corr-en optEn) Returns 1 if encoder correction is enabled and 0 if it is disabled. The optional argument optEn can be used to enable or disable encoder correction. Example: ; Prints 1 if correction is enabled, 0 otherwise. Read only, nothing is chaged. (print (enc-corr-en)) ; Enable correction (enc-corr-en 1) ; Disable correction (enc-corr-en 0)
+"""
+    },
+    {
+        name = "enc-sample",
+        comment = """
+(enc-sample buffer samples) This function is used for building correction tables for encoders. It will take about 10k samples per seconds if the difference between the motor position derived from the back-emf as well as the motor position derived from the encoder and store those samples in the argument buffer, which is a byte array. The argument samples sets how many samples to take - given that the rate is around 10k passing the argument 1000 will run this function for 0.1 seconds. The format of buffer is a byte array with 720 floats, meaning that its size has to be 720x4 = 2880 bytes. There is one float for the accumulater error on every encoder postion in whole degrees as well as one float for the number of samples taken at that postion. Note: This function only works when the motor is spinning but undriven, so either it has to be used by externally driving the motor or by spinning it up first, releasing it and then running this function while it is spinning down. Example: ; Create buffer for samples (def samples (bufcreate (* 360 8))) (bufclear samples) ; Spin up motor for 3 seconds (looprange i 0 30 { (set-rpm 6000) (sleep 0.1) }) ; Stop driving motors so that it is coasting (set-current 0.0) ; Collect 800 samples (enc-sample samples 800) ; This function can be used to get the accumulated value for ; a given encoder position (defun get-val (pos) (bufget-f32 samples (* pos 8))) ; This function can be used to get the number of samples for ; a given encoder position (defun get-samp (pos) (bufget-f32 samples (+ (* pos 8) 4))) Note that the example above is not complete and many more than 800 samples are required for generating a complete encoder correction table. VESC Tool includes an example file named test_encoder.lbm with a complete implementation that works by spinning up the motor multiple times and collecting samples.
+"""
+    },
+    {
+        name = "setup-ah",
+        comment = """
+(setup-ah) Get the number of amp hours consumed since start.
+"""
+    },
+    {
+        name = "setup-ah-chg",
+        comment = """
+(setup-ah-chg) Get the number of amp hours charged since start.
+"""
+    },
+    {
+        name = "setup-wh",
+        comment = """
+(setup-wh) Get the number of watt hours consumed since start.
+"""
+    },
+    {
+        name = "setup-wh-chg",
+        comment = """
+(setup-wh-chg) Get the number of watt hours charged since start.
+"""
+    },
+    {
+        name = "setup-current",
+        comment = """
+(setup-current) Get total motor current. Positive means that current is flowing into the motor and negative means that current is flowing out of the motor (regenerative braking).
+"""
+    },
+    {
+        name = "setup-current-in",
+        comment = """
+(setup-current-in)
+"""
+    },
+    {
+        name = "setup-num-vescs",
+        comment = """
+(setup-num-vescs) Get the number of VESC-based motor controllers the setup values are accumulated from.
+"""
+    },
+    {
+        name = "can-msg-age",
+        comment = """
+(can-msg-age id msg) Get age of can-message msg from device with can-id id. Can be used to determine how up-to-date the values are from the different messages. nil is returned if the given message has never been received from the given id.
+"""
+    },
+    {
+        name = "canset-current",
+        comment = """
+(canset-current id current optOffDelay) Set current over CAN-bus on VESC with id. Example for setting 25A on VESC with id 115: (canset-current 115 25) See set-current for details on what the optional argument optOffDelay does.
+"""
+    },
+    {
+        name = "canset-current-rel",
+        comment = """
+(canset-current-rel id current optOffDelay) Same as above, but relative current in the range -1.0 to 1.0. See (set-current) for details on what relative current means. See set-current for details on what the optional argument optOffDelay does.
+"""
+    },
+    {
+        name = "canset-duty",
+        comment = """
+(canset-duty id duty) Set duty cycle over CAN-bus on VESC with id. Range -1.0 to 1.0.
+"""
+    },
+    {
+        name = "canset-brake",
+        comment = """
+(canset-brake id current) Set braking current over CAN-bus.
+"""
+    },
+    {
+        name = "canset-brake-rel",
+        comment = """
+(canset-brake-rel id current) Set relative braking current over CAN-bus. Range 0.0 to 1.0.
+"""
+    },
+    {
+        name = "canset-rpm",
+        comment = """
+(canset-rpm id rpm) Set rpm over CAN-bus.
+"""
+    },
+    {
+        name = "canset-pos",
+        comment = """
+(canset-pos id pos) Set position control in degrees over CAN-bus. Range 0.0 to 1.0.
+"""
+    },
+    {
+        name = "canget-current",
+        comment = """
+(canget-current id) Get current over CAN-bus on VESC with id.
+"""
+    },
+    {
+        name = "canget-current-dir",
+        comment = """
+(canget-current-dir id) Get directional current over CAN-bus on VESC with id. See (get-current-dir) for what directional means.
+"""
+    },
+    {
+        name = "canget-current-in",
+        comment = """
+(canget-current-in id) Get input current over CAN-bus on VESC with id.
+"""
+    },
+    {
+        name = "canget-duty",
+        comment = """
+(canget-duty id) Get duty cycle over CAN-bus on VESC with id.
+"""
+    },
+    {
+        name = "canget-rpm",
+        comment = """
+(canget-rpm id) Get RPM over CAN-bus on VESC with id.
+"""
+    },
+    {
+        name = "canget-temp-fet",
+        comment = """
+(canget-temp-fet id) Get MOSFET temperature over CAN-bus on VESC with id.
+"""
+    },
+    {
+        name = "canget-temp-motor",
+        comment = """
+(canget-temp-motor id) Get motor temperature over CAN-bus on VESC with id.
+"""
+    },
+    {
+        name = "canget-speed",
+        comment = """
+(canget-speed id) Get speed in meters per second over CAN-bus on VESC with id. The gearing, wheel diameter and number of motor poles from the local configuration will be used for converting the RPM to meters per second.
+"""
+    },
+    {
+        name = "canget-dist",
+        comment = """
+(canget-dist id) Get distance traveled in meters over CAN-bus on VESC with id. As with (canget-speed id), the local configuration will be used to convert the tachometer value to meters.
+"""
+    },
+    {
+        name = "canget-ppm",
+        comment = """
+(canget-ppm id) Get PPM-input from the VESC with id on the CAN-bus. Note that CAN status message 6 as well as the PPM-app must be active on that VESC for this function to work.
+"""
+    },
+    {
+        name = "canget-adc",
+        comment = """
+(canget-adc id ch) Get ADC channel ch from the VESC with id on the CAN-bus. Note that CAN status message 6 must be active on that VESC for this function to work.
+"""
+    },
+    {
+        name = "canget-vin",
+        comment = """
+(canget-vin id) Get input voltage on ESC with id on the CAN-bus. Note that CAN status message 5 must be active on that ESC for this function to work.
+"""
+    },
+    {
+        name = "can-list-devs",
+        comment = """
+(can-list-devs) List CAN-devices that have been heard on the CAN-bus since boot. This function is fast as it does not actively scan the CAN-bus, but it relies on the devices sending status message 1.
+"""
+    },
+    {
+        name = "can-scan",
+        comment = """
+(can-scan) Actively scan the CAN-bus and return a list with devices that responded. This function takes several seconds to run, but also finds devices that do not actively send messages and only respond to a ping message.
+"""
+    },
+    {
+        name = "can-ping",
+        comment = """
+(can-ping id) Ping can-device with id. Valid IDs are 0 to 253. If the device responds 0, 1 or 2 is returned, meaning If the device does not respond nil is returned.
+"""
+    },
+    {
+        name = "can-local-id",
+        comment = """
+(can-local-id) Get local CAN ID.
+"""
+    },
+    {
+        name = "can-update-baud",
+        comment = """
+(can-update-baud kbits) Update CAN baudrate locally and on connected CAN-devices. kbits is the new baudrate. Note that this is only supported when all CAN-devices have firmware 6.06 or later. If the update fails the CAN-bus can become unusable until the settings are restored manually on each device. Valid baudrates in kbits are 125, 250, 500, 1000, 10, 20, 50, 75 and 100. Example: (can-update-baud 1000) ; Update baudrate to 1 MBit/s (can-update-baud 250) ; Update baudrate to 250 KBit/s
+"""
+    },
+    {
+        name = "can-send-sid",
+        comment = """
+(can-send-sid id data) Send standard ID CAN-frame with id and data. Data is a list with bytes, and the length of the list (max 8) decides how many data bytes are sent. Example: (can-send-sid 0x11FF11 (list 0xAA 0x11 0x15)) data can be a list or a byte array .
+"""
+    },
+    {
+        name = "can-send-eid",
+        comment = """
+(can-send-eid id data) Same as (can-send-sid), but sends extended ID frame.
+"""
+    },
+    {
+        name = "can-recv-sid",
+        comment = """
+(can-recv-sid optTimeout) Block current thread until a standard-id can-frame arrives. The optional argument optTimeout can be used to specify a timeout in seconds. If a timeout occurs the symbol timeout will be returned, otherwise a list with the following format will be returned: (id data) Usage example: (print (can-recv-sid)) > (2i32 [1 2 3])
+"""
+    },
+    {
+        name = "can-recv-eid",
+        comment = """
+(can-recv-eid optTimeout) Same as (can-recv-sid), but waits for extended ID frame.
+"""
+    },
+    {
+        name = "can-cmd",
+        comment = """
+(can-cmd id cmd) Execute command cmd on CAN-device with ID id. The command cmd is sent as a string and will be parsed and evaluated by the receiver. This is useful to execute arbitrary code on a CAN-device that is not covered by the other CAN-Commands . This function has more overhead than other CAN-Commands, so if possible they should be used instead. Example: ; Configuration update on ID54: (can-cmd 54 "(conf-set 'max-speed 10.0)") ; The string-functions can be used for setting something from a variable (def max-speed-kmh 25.0) (can-cmd 54 (str-from-n (/ max-speed-kmh 3.6) "(conf-set 'max-speed %.3f)")) Note can-cmd is limited to two commands per second per device. If commands are sent more often that that they are ignored. Note2 A better way to achieve something similar to can-cmd but with much less overhead and unlimited rate is using the Code Server library.
+"""
+    },
+    {
+        name = "can-start",
+        comment = """
+(can-start optPinTx optPinRx) Start or restart CAN-driver. The optional arguments optPinTx and optPinRx can be used to specify which pins to use as CAN TX and CAN RX. If they are omitted the default pins will be used. If the hardware does not have default CAN pins and no pins are specified an error is returned. This function can also be used while the CAN-driver is running for changing CAN-pins.
+"""
+    },
+    {
+        name = "can-stop",
+        comment = """
+(can-stop) Stop CAN-bus driver.
+"""
+    },
+    {
+        name = "can-use-vesc",
+        comment = """
+(can-use-vesc use-vesc) Enable or disable decoding of the VESC Protocol on the CAN-bus. By default it is enabled. The VESC Protocol is used for communication with VESC Tool, the VESC BMS and VESC motor controllers on the CAN-bus. Disabling the VESC Protocol is useful for using the express as a generic CAN sniffer and debugger.
+"""
+    },
+    {
+        name = "canmsg-recv",
+        comment = """
+(canmsg-recv slot timeout) Wait for message on slot with timeout seconds. Returns a byte array with the received message on success or timeout if nothing is received before the timeout has passed. A negative timeout means wait forever.
+"""
+    },
+    {
+        name = "canmsg-send",
+        comment = """
+(canmsg-send can-id slot msg) Send msg over CAN-bus to slot on can-id. msg is a byte array.
+"""
+    },
+    {
+        name = "sin",
+        comment = """
+(sin angle) Get the sine of angle. Unit: Radians.
+"""
+    },
+    {
+        name = "cos",
+        comment = """
+(cos angle) Get the cosine of angle. Unit: Radians.
+"""
+    },
+    {
+        name = "tan",
+        comment = """
+(tan angle) Get the tangent of angle. Unit: Radians.
+"""
+    },
+    {
+        name = "asin",
+        comment = """
+(asin x) Get the arc sine of x. Unit: Radians.
+"""
+    },
+    {
+        name = "acos",
+        comment = """
+(acos x) Get the arc cosine of x. Unit: Radians.
+"""
+    },
+    {
+        name = "atan",
+        comment = """
+(atan x) Get the arc tangent of x. Unit: Radians.
+"""
+    },
+    {
+        name = "atan2",
+        comment = """
+(atan2 y x) Get the arc tangent of y / x. Unit: Radians. This version uses the signs of y and x to determine the quadrant.
+"""
+    },
+    {
+        name = "pow",
+        comment = """
+(pow base power) Get base raised to power.
+"""
+    },
+    {
+        name = "sqrt",
+        comment = """
+(sqrt x) Get the square root of x.
+"""
+    },
+    {
+        name = "log",
+        comment = """
+(log x) Get the base-e logarithm of x.
+"""
+    },
+    {
+        name = "log10",
+        comment = """
+(log10 x) Get the base-10 logarithm of x.
+"""
+    },
+    {
+        name = "floor",
+        comment = """
+(floor x) Round x down to the closest integer. Added in FW 6.02.
+"""
+    },
+    {
+        name = "ceil",
+        comment = """
+(ceil x) Round x up to the closest integer. Added in FW 6.02.
+"""
+    },
+    {
+        name = "round",
+        comment = """
+(round x) Round x to the closest integer. Added in FW 6.02.
+"""
+    },
+    {
+        name = "deg2rad",
+        comment = """
+(deg2rad x) Converts x from degrees to radians.
+"""
+    },
+    {
+        name = "rad2deg",
+        comment = """
+(rad2deg x) Converts x from radians to degrees.
+"""
+    },
+    {
+        name = "abs",
+        comment = """
+(abs x) Get the absolute value of x.
+"""
+    },
+    {
+        name = "throttle-curve",
+        comment = """
+(throttle-curve value accel brake mode) Apply throttle curve on value. accel (range -1 to 1) is the curve constant for acceleration (when value is greater than 0) and brake (range -1 to 1) is the curve constant for braking (when value is less than 0). mode (0, 1 or 2) is the throttle curve mode. Negative curve constants mean that the throttle will be gentler in the beginning and more aggressive with towards the end and positive curve constants mean the opposite. The modes are 0: Exponential, 1: Natural and 2: Polynomial. You can have a look at the throttle curves in VESC Tool for the PPM, ADC or VESC Remote app and experiment with the mode and curve constants to see a plot of the response.
+"""
+    },
+    {
+        name = "rand",
+        comment = """
+(rand optSeed) Generate random number in the range 0 to (rand-max). Example: ; Generate integer in the range 0 to 99 (mod (rand) 100) ; Generate number in the range 0.0 to 1.0 (/ (to-float (rand)) (rand-max))
+"""
+    },
+    {
+        name = "rand-max",
+        comment = """
+(rand-max) Returns the maximum number that rand can return.
+"""
+    },
+    {
+        name = "bits-enc-int",
+        comment = """
+(bits-enc-int initial offset number bits) Put bits of number in initial at offset and return the result. For example, if the bits initial are aaaaaaaa, number is bbb, offset is 2 and bits is 3 the result is aaabbbaa. For reference, the corresponding operation in C is: initial &= ~((0xFFFFFFFF >> (32 - bits)) << offset); initial |= (number << (32 - bits)) >> (32 - bits - offset);
+"""
+    },
+    {
+        name = "bits-dec-int",
+        comment = """
+(bits-dec-int value offset size) Return size bits of value at offset. For example if the bits of value are abcdefgh, offset is 3 and size it 3 a number with the bits cde is returned. The corresponding operation in C is: val >>= offset; val &= 0xFFFFFFFF >> (32 - bits);
+"""
+    },
+    {
+        name = "raw-adc-current",
+        comment = """
+(raw-adc-current motor phase useRaw) Get raw current measurements. Motor is the motor index (1 or 2), phase is the phase (1, 2 or 3) and useRaw is whether to convert the measurements to currents or to use raw ADC values. Note: These samples can come from either V0 or V7 depending on when the function is called (although most likely V7 as less other computations happen then), so when the motor is running this is most likely not going to look good, especially if the hardware does not have phase shunts. This function is intended for debugging hardware and returns just was goes into the ADC without any processing. Example for reading phase B on motor 1 as raw ADC values: (raw-adc-current 1 2 1)
+"""
+    },
+    {
+        name = "raw-adc-voltage",
+        comment = """
+(raw-adc-voltage motor phase useRaw) Same as (raw-adc-current), but measures phase voltages instead.
+"""
+    },
+    {
+        name = "raw-mod-alpha",
+        comment = """
+(raw-mod-alpha) Get alpha modulation. Range -1.0 to 1.0 (almost).
+"""
+    },
+    {
+        name = "raw-mod-beta",
+        comment = """
+(raw-mod-beta) Get beta modulation. Range -1.0 to 1.0 (almost).
+"""
+    },
+    {
+        name = "raw-mod-alpha-measured",
+        comment = """
+(raw-mod-alpha-measured) Same as (raw-mod-alpha), but derives the modulation from the phase voltage reading and/or dead-time compensation.
+"""
+    },
+    {
+        name = "raw-mod-beta-measured",
+        comment = """
+(raw-mod-beta-measured) Same as (raw-mod-beta), but derives the modulation from the phase voltage reading and/or dead-time compensation.
+"""
+    },
+    {
+        name = "raw-hall",
+        comment = """
+(raw-hall motor optSamples) Read hall sensors for motor (1 or 2) and return their states in a list. The optional argument optSamples (max 20) can be used to set how many times the hall sensors are sampled; if it is not supplied the number of samples from the motor configuration will be used. The function (ix list ind) can be used to get an element from the list. Example: (ix (raw-hall 1) 0) ; Get hall sensor 1 state (index 0)
+"""
+    },
+    {
+        name = "uart-start",
+        comment = """
+(uart-start baudrate optHd) Start the UART driver at baudrate on the COMM-port. optHd is an optional argument that can be set to 'half-duplex to use half-duplex mode. In half-duplex mode only the tx-pin is used. If any app is using the UART pins it will be stopped first. Example: (uart-start 115200) ; Start UART at 115200 baud in full duplex mode (uart-start 115200 'half-duplex) ; Start UART at 115200 baud in half duplex mode
+"""
+    },
+    {
+        name = "uart-start",
+        comment = """
+(uart-start uart-num rx-pin tx-pin baudrate) This version of uart-start is for the Express-platform. Start the UART uart-num on the pins rx-pin and tx-pin with baudrate. Uart-num can be 0 or 1 and any pin can be used. Note that GNSS uses uart 0, so when a gnss-receiver is connected uart 1 must be used. Example: ; Start UART 1 with pin 20 for RX, pin 21 for TX and 115200 baudrate. (uart-start 1 20 21 115200)
+"""
+    },
+    {
+        name = "uart-stop",
+        comment = """
+(uart-stop) Stop the UART-driver and free the resources it uses.
+"""
+    },
+    {
+        name = "uart-write",
+        comment = """
+(uart-write array) Write array (see byte array for details) to the UART. The array-argument can also be a list. Examples: (uart-write "Hello World!") ; Write the string hello world! (define arr (array-create 6)) ; Create a 6 byte long array (bufset-i16 arr 0 1123) ; Set byte 0 and 1 to 1123 (bufset-i32 arr 2 424242) ; Set byte 2 to 5 to 424242 (uart-write arr) ; Write arr to the uart
+"""
+    },
+    {
+        name = "uart-read",
+        comment = """
+(uart-read array num optOffset optStopAt optTimeout) Read num bytes into array at offset optOffset. Stop reading if the character optStopAt is received or optTimeout time has passed. The last three arguments are optional. Setting optTimeout to 0 (or omitting the argument) makes this function return immediately, even when there is nothing to read. The return value is the number of bytes read. The optional arguments can also be set to nil in case not all of them are used. Example: ; Read at most 10 characters into arr and return if it takes more than ; 0.5 seconds to receive anything. (def arr (bufcreate 10)) (var res (uart-read arr 10 nil nil 0.5)) (print (list res arr))
+"""
+    },
+    {
+        name = "uart-read-bytes",
+        comment = """
+(uart-read-bytes array num offset) Read num bytes into buffer at offset. This function is blocking, so it will not return until the specified amount of bytes is read.
+"""
+    },
+    {
+        name = "uart-read-until",
+        comment = """
+(uart-read-until array num offset end) Same as uart-read-bytes, but will return when the byte end is read.
+"""
+    },
+    {
+        name = "uartcomm-start",
+        comment = """
+(uartcomm-start uart-num rx-pin tx-pin baudrate) Start VESC Tool-compatible packet handler over UART. That allows VESC Tool to connect to those pins using an USB-SERIAL adapter. Uart-num can be 0 or 1 and any pins can be used. Multiple UARTs can be used simultaneously.
+"""
+    },
+    {
+        name = "uartcomm-stop",
+        comment = """
+(uartcomm-stop uart-num) Stop UARTCOMM on uart-num.
+"""
+    },
+    {
+        name = "i2c-start",
+        comment = """
+(i2c-start optRate optPinSda optPinScl) Start the I2C driver on the COMM-port on the VESC. If any app is using the I2C pins it will be stopped first. optRate is an optional argument for the I2C bitrate. optPinSda and optPinScl are optional arguments for using different SDA and SCL pins. Example: (i2c-start 'rate-400k) ; 400 kbps and the default SDA and SDC pins (i2c-start 'rate-100k 'pin-swdio 'pin-swclk) ; 100 kbps and SWDIO and SWCLK as SDA and SCL ; Available bitrates 'rate-100k 'rate-200k 'rate-400k 'rate-700k ; Available pins 'pin-rx 'pin-tx 'pin-swdio 'pin-swclk 'pin-hall1 'pin-hall2 'pin-hall3 'pin-hall4 'pin-hall5 'pin-hall6 'pin-adc1 'pin-adc2 'pin-adc3 'pin-adc4 'pin-ppm ; Note: On express the pins are a number
+"""
+    },
+    {
+        name = "i2c-tx-rx",
+        comment = """
+(i2c-tx-rx addr arrTx optArrRx) Send array (or list) arrTx to the I2C-device with address addr. Optionally receive a response to opArrRx. Example: ; Create 14 byte long array (define arr (array-create 14)) ; Send 0x3B to device 0x68 and receive 14 bytes into arr (i2c-tx-rx 0x68 (list 0x3B) arr)
+"""
+    },
+    {
+        name = "i2c-restore",
+        comment = """
+(i2c-restore) Sends a sequence of bits in an attempt to restore the i2c-bus. Can be used if an i2c-device hangs and refuses to respond.
+"""
+    },
+    {
+        name = "i2c-detect-addr",
+        comment = """
+(i2c-detect-addr address) Test if address is present on the bus by writing to it and checking the nack-bit. Returns true if the address is present, nil otherwise. Can be used to detect if I2C-devices are plugged in and powered correctly.
+"""
+    },
+    {
+        name = "imu-start-lsm6",
+        comment = """
+(imu-start-lsm6 optRate optPinSda optPinScl) Start LSM6DSx IMU driver over i2c. Takes the same arguments as i2c-start and shares the same i2c-pins. Example: (imu-start-lsm6 'rate-400k 21 20)
+"""
+    },
+    {
+        name = "imu-stop",
+        comment = """
+(imu-stop) Stop IMU-driver and put IMU in sleep mode.
+"""
+    },
+    {
+        name = "gpio-configure",
+        comment = """
+(gpio-configure pin mode) Configure GPIO pin to mode. Example: (gpio-configure 'pin-rx 'pin-mode-out) ; Set pin RX to output ; Available pins 'pin-rx ; RX-pin on the COMM-port 'pin-tx ; TX-pin on the COMM-port 'pin-swdio ; IO-pin on the SWD-port 'pin-swclk ; CLK-pin on the SWD-port 'pin-hall1 ; Sensor port hall1 'pin-hall2 ; Sensor port hall2 'pin-hall3 ; Sensor port hall3 'pin-hall4 ; Sensor port motor 2 hall1 (FW 7.00+) 'pin-hall5 ; Sensor port motor 2 hall2 (FW 7.00+) 'pin-hall6 ; Sensor port motor 2 hall3 (FW 7.00+) 'pin-adc1 ; ADC1-pin on COMM-port 'pin-adc2 ; ADC2-pin on COMM-port 'pin-adc3 ; ADC3-pin on COMM-port (if available) 'pin-adc4 ; ADC4-pin on COMM-port (if available) 'pin-ppm ; Signal-pin on PPM-port ; On express the pins are a number and not a symbol. ; Available modes 'pin-mode-out ; Output 'pin-mode-od ; Open drain output 'pin-mode-od-pu ; Open drain output with pull-up 'pin-mode-od-pd ; Open drain output with pull-down 'pin-mode-in ; Input 'pin-mode-in-pu ; Input with pull-up 'pin-mode-in-pd ; Input with pull-down 'pin-mode-analog ; Analog (NOTE: only works on the ADC-pins)
+"""
+    },
+    {
+        name = "gpio-write",
+        comment = """
+(gpio-write pin state) Write state to pin. If the pin is set to an output 1 will set it to VCC and 0 to GND. If the pin is open drain 1 will set it floating and 0 will set it to GND. Example: (gpio-write 'pin-rx 1) ; Set pin rx to 1
+"""
+    },
+    {
+        name = "gpio-read",
+        comment = """
+(gpio-read pin) Read state of pin. Returns 1 if the pin is high, 0 otherwise.
+"""
+    },
+    {
+        name = "gpio-hold",
+        comment = """
+(gpio-hold pin state) It state is 1, the state of pin will be locked to its state at the moment of the call. If state is 0 the pin will be unlocked. The state persists through reset, but not through deep sleep.
+"""
+    },
+    {
+        name = "gpio-hold-deepsleep",
+        comment = """
+(gpio-hold-deepsleep state) It state is 1, all digital pads will hold their state during deep sleep. If it is set to 0 they will reset to their initial state when entering deep sleep.
+"""
+    },
+    {
+        name = "pwm-start",
+        comment = """
+(pwm-start freq duty expressChannel expressPin optExpressBits) Start PWM-generation at frequency freq Hz and duty-cycle duty. The arguments expressChannel, expressPin and optExpressBits are only used on the Express-platform and control which channel and pin to use and optionally how many bits of resolution to use (2 - 14 bits, 10 bits default). On the ESC-platform the PPM/Servo-pin is always used. This function returns the actual frequency that will be used as some rounding can be done when setting up the timer. Example: ; Express: 2 kHz PWM with 20% duty, channel 0 pin 20, 12 bits resolution (pwm-start 2000 0.2 0 20 12) ; ESC: 2 kHz PWM with 20% duty on the Servo/PPM-pin (pwm-start 2000 0.2)
+"""
+    },
+    {
+        name = "pwm-stop",
+        comment = """
+(pwm-stop expressChannel) Stop PWM-output. On the express-platform the channel must be specified.
+"""
+    },
+    {
+        name = "pwm-set-duty",
+        comment = """
+(pwm-set-duty dutyCycle expressChannel) Set PWM duty cycle. Range 0.0 to 1.0. On the express-platform the channel must be specified.
+"""
+    },
+    {
+        name = "icu-start",
+        comment = """
+(icu-start freqHz pol) Start input capture on the PPM-pin with timer frequency freqHz hertz and polarity pol. Polarity = 1 means that the high part of the pulse is measured and polarity = 0 means that the low part of the pulse is measured. Every time a pulse is received an event is generated. Example: ; Run timer at 1 MHz and capture the positive part of the pulse (icu-start 1000000 1) (def cb-cnt 0) (defun proc-icu (width period) { (def icu-w width) (def icu-p period) (def cb-cnt (+ cb-cnt 1)) }) (defun event-handler () (loopwhile t (recv ((event-icu-period . ((? width) . (? period))) (proc-icu width period)) (_ nil) ))) ; Spawn event handler (event-register-handler (spawn event-handler)) ; Enable the period event, which is generated at the end of the period. (event-enable 'event-icu-period)
+"""
+    },
+    {
+        name = "icu-width",
+        comment = """
+(icu-width) Get the width of the last captured pulse. The unit is timer ticks, which depends on the freqHz you pick when running icu-start. E.g. if freqHz is 1000000 (1 MHz) the unit will be one microsecond.
+"""
+    },
+    {
+        name = "icu-period",
+        comment = """
+(icu-period) Get the period of the last captured pulse. The unit is timer ticks, which depends on the freqHz you pick when running icu-start. E.g. if freqHz is 1000000 (1 MHz) the unit will be one microsecond.
+"""
+    },
+    {
+        name = "as5047x-init",
+        comment = """
+(as5047x-init pin-miso pin-sck pin-cs) Initialize the AS504x-driver on the specified pins.
+"""
+    },
+    {
+        name = "as5047x-deinit",
+        comment = """
+(as5047x-deinit) De-initialize the AS504x-driver and restore the pins.
+"""
+    },
+    {
+        name = "as5047x-angle",
+        comment = """
+(as5047x-angle) Read angle from the AS504x-encoder in degrees.
+"""
+    },
+    {
+        name = "bme280-start",
+        comment = """
+(bme280-start optRate optPinSda optPinScl) Start BME280 pressure/humidity/temperature sensor driver over i2c. Takes the same arguments as i2c-start and shares the same i2c-pins. Also shares the i2c-mutex, so it can be used together with other I2C peripherals as long as they use the same pins. Example: (bme280-start 'rate-100k 21 20)
+"""
+    },
+    {
+        name = "bme280-stop",
+        comment = """
+(bme280-stop) Stop the BME280 driver.
+"""
+    },
+    {
+        name = "bme280-hum",
+        comment = """
+(bme280-hum) Read the relative humidity from the BME280.
+"""
+    },
+    {
+        name = "bme280-temp",
+        comment = """
+(bme280-temp) Read the temperature from the BME280 in degrees celcius.
+"""
+    },
+    {
+        name = "bme280-pres",
+        comment = """
+(bme280-pres) Read the pressure from the BME280 in pascal.
+"""
+    },
+    {
+        name = "conf-set",
+        comment = """
+(conf-set param value) Set param to value. This can be done while the motor is running and it will be applied instantly. Note that the parameter won't be stored in flash, so it will be back to the old value on the next boot. To store all parameters that have been changed you can use conf-store . Example: (conf-set 'max-speed (/ 25 3.6)) ; Set the maximum speed to 25 km/h
+"""
+    },
+    {
+        name = "conf-get",
+        comment = """
+(conf-get param optDefLim) Get the value of param. optDefLim is an optional argument that can be set to 1 or 2; 1 means get the default value and 2 means get the limit value. Example: (conf-get 'foc-motor-r) ; Get the motor resistance in milliOhm (conf-get 'controller-id 1) ; Get the default CAN ID of this VESC (conf-get 'l-current-max 2) ; Get the maximum allowed current on this hardware
+"""
+    },
+    {
+        name = "conf-store",
+        comment = """
+(conf-store) Store the current configuration to flash. This will stop the motor. Note: On the express most settings require a reboot to be applied. Remember to use conf-store before rebooting.
+"""
+    },
+    {
+        name = "store-backup",
+        comment = """
+(store-backup) Store backup data, such as odometer and runtime counter, to flash. This will stop the motor. conf-store will also store this data, but this function alone is much faster as the configurations are not stored.
+"""
+    },
+    {
+        name = "conf-detect-foc",
+        comment = """
+(conf-detect-foc canFwd maxLoss minCurrIn maxCurrIn openloopErpm slErpm) Run the same autodetection as the wizard in VESC Tool does. This function will block the current lispBM-thread until in finishes (other threads will continue running). Arguments: canFwd ; Scan CAN-bus and detect on all VESCs found on CAN-bus maxLoss ; Maximum power loss in W to derive current limit from minCurrIn ; Minimum input current in A (negative value) maxCurrIn ; Maximum input current in A openLoopErpm ; Openlopp ERPM setting slErpm ; Sensorless ERPM setting Result: 0 ; OK and no sensors found 1 ; OK and hall sensors found 2 ; OK and AS5047 found -1 ; Fault code during sensor detection -10 ; Flux linkage detection failed -50 ; CAN-detection failed -51 ; CAN-detection timed out Example: ; No can detection, 50w losses max, -20 A to 50 A input current, 800 ERPM openloop and 2500 erpm for sensorless in case sensors are found (print (conf-detect-foc 0 50 -20 50 800 2500)) ; Print the result when done
+"""
+    },
+    {
+        name = "conf-set-pid-offset",
+        comment = """
+(conf-set-pid-offset offset optStore) Set the PID controller offset such that the current angle becomes offset. This can be used in position control applications when e.g. homing against a limit switch. The optional argument optStore can be set to true to store the offset persistently (although that requires stopping the motor).
+"""
+    },
+    {
+        name = "conf-measure-res",
+        comment = """
+(conf-measure-res current optSamples) Measure motor resistance with current. The optional argument optSamples sets the number of samples to use (default 100). This command is useful to update the configuration before starting the motor as the resistance is the most important when it comes to sensorless low-speed performance. It is also useful to sanity check if the motor is shorted out or if a connector is loose. Such faults cause a relatively significant change in resistance. Changes with more than 50% compared to the detected value are most likely faults. NOTE: Phase filters are required to get accurate resistance measurements, so resistance-based fault detection is not as useful on hardware without phase filters.
+"""
+    },
+    {
+        name = "conf-measure-ind",
+        comment = """
+(conf-measure-ind target-current optSamples) Measure motor inductance with target-current. The optional argument optSamples sets the number of samples to use (default 100). returns: ({ld_lq_avg} {ld_lq_diff} {actual_measurement_current} fault-code) Can not be used when the motor is running. The measurement current is not gaurenteed to reach the target, and the actual_measurement_current parameter should be used to verify the actual current used. Useful for finding the saturation inductance curve of a motor.
+"""
+    },
+    {
+        name = "conf-restore-mc",
+        comment = """
+(conf-restore-mc) Restore motor configuration to the default values on the selected motor. The current and voltage offsets are kept from the old configuration.
+"""
+    },
+    {
+        name = "conf-restore-app",
+        comment = """
+(conf-restore-app) Restore app configuration to the default values.
+"""
+    },
+    {
+        name = "conf-dc-cal",
+        comment = """
+(conf-dc-cal calUndriven) Run FOC DC offset calibration. calUndriven can be set to true for including the undriven voltages in the calibration, which requires that the motor stands still. If the calibration fails nil is returned and on success a list with the new offsets in the following format is returned: (i0 i1 i2 v0 v1 v2 v0-undriven v1-undriven v2-undriven) Since firmware 6.06 the argument calUndriven can be omitted. When it is omitted no calibration is done and the offsets in use are returned.
+"""
+    },
+    {
+        name = "conf-dc-cal-set",
+        comment = """
+(conf-dc-cal-set i0 i1 i2 v0 v1 v2 v0-undriven v1-undriven v2-undriven) Manually set the offsets on the selected motor. Arguments that are set to nil will leave the corresponding offset unchanged. If not all arguments are given the ones left out will not be updated. Example: ; Set the i2-offset to 1.1 ADC counts and the v2-offset to 2.3 V. Leave the rest unchanged. (conf-dc-cal-set nil nil 1.1 nil nil 2.3)
+"""
+    },
+    {
+        name = "conf-enc-sincos",
+        comment = """
+(conf-enc-sincos optSinAmp optCosAmp optSinOfs optCosOfs optFilter optPhaseCorr) Configure Sin/Cos encoder. Arguments that are set to nil will leave the corresponding parameter unchanged. If not all arguments are given the ones left out will not be updated. The resulting configuration is returned. If no arguments are given the resulting configuration is returned. Example: (conf-enc-sincos 1.0 1.0 1.65 1.65 0.5 0.0) ;> (1.0 1.0 1.65 1.65 0.5 0.0) (conf-enc-sincos) ;> (1.0 1.0 1.65 1.65 0.5 0.0) The update will be applied until reboot. To store it permanently conf-store can be used.
+"""
+    },
+    {
+        name = "conf-get-limits",
+        comment = """
+(conf-get-limits) Get all overridden current limits from speed, temperature, voltage, wattage etc. Return the following list: (motor-min motor-max input-min input-max)
+"""
+    },
+    {
+        name = "conf-detect-lambda-enc",
+        comment = """
+(conf-detect-lambda-enc current duty erpm-per-sec resistance-mOhm inductance-uH) Detect flux linkage as well as encoder parameters if an encoder is configured. The parameters are If the detection fails nil is returned. If a fault occurs during the detection the fault code is returned. Otherwise, the following list with the result is returned: (flux-linkage flux-linkage-undriven undriven-samples enc-offset enc-ratio enc-inverted) Where the result values are Example: (print (conf-detect-lambda-enc 40 0.3 1500 7 70)) -> (0.017543f32 0.018353f32 2000.000000f32 6.898595f32 4.000000f32 1) ; Use result of resistance and inductance measurement (print (conf-detect-lambda-enc 40 0.3 1500 (conf-measure-res 30) (first (conf-measure-ind 20))))
+"""
+    },
+    {
+        name = "conf-detect-hall",
+        comment = """
+(conf-detect-hall current) Runs hall sensor detection using current in openloop. Returns the hall sensor table as a byte array on success or nil on failure.
+"""
+    },
+    {
+        name = "conf-remap-as504x",
+        comment = """
+(conf-remap-as504x optCs optSck optMosi optMiso) Remap one or more AS504x encoder pins. All arguments are optional and nil can be used to leave pins unchanged. Example: ; Use 'pin-swdio as chip select and 'pin-swclk as clock. Leave other pins ; unchanged (conf-remap-as504x 'pin-swdio 'pin-swclk) ; Use 'pin-swclk as clock. Leave other pins unchanged (conf-remap-as504x nil 'pin-swclk) ; Available pins 'pin-rx 'pin-tx 'pin-swdio 'pin-swclk 'pin-hall1 'pin-hall2 'pin-hall3 'pin-hall4 'pin-hall5 'pin-hall6 'pin-adc1 'pin-adc2 'pin-adc3 'pin-adc4 'pin-ppm
+"""
+    },
+    {
+        name = "conf-remap-hall",
+        comment = """
+(conf-remap-hall optHall1 optHall2 optHall3 optHall1M2 optHall2M2 optHall3M2) Remap one or more hall sensor pins. All arguments are optional and nil can be used to leave pins unchanged. Example: ; Use 'pin-swdio as hall 1 and 'pin-swclk as hall 2. Leave other pins ; unchanged (conf-remap-hall 'pin-swdio 'pin-swclk) ; Use 'pin-swclk as hall 2. Leave other pins unchanged (conf-remap-hall nil 'pin-swclk) ; Restore default hall sensor mapping (conf-remap-hall) ; Available pins 'pin-rx 'pin-tx 'pin-swdio 'pin-swclk 'pin-hall1 'pin-hall2 'pin-hall3 'pin-hall4 'pin-hall5 'pin-hall6 'pin-adc1 'pin-adc2 'pin-adc3 'pin-adc4 'pin-ppm
+"""
+    },
+    {
+        name = "eeprom-store-f",
+        comment = """
+(eeprom-store-f addr number) Store float number on emulated eeprom at address addr. Addr range: 0 to 127. Note that this will stop the motor briefly as writing to the flash memory cannot be done at the same time as the motor is running.
+"""
+    },
+    {
+        name = "eeprom-read-f",
+        comment = """
+(eeprom-read-f addr) Read float number on emulated eeprom at address addr. Addr range: 0 to 127. If nothing was stored on that address this function returns nil.
+"""
+    },
+    {
+        name = "eeprom-store-i",
+        comment = """
+(eeprom-store-i addr number) Same as eeprom-store-f, but store number as i32 instead of float.
+"""
+    },
+    {
+        name = "eeprom-read-i",
+        comment = """
+(eeprom-read-i addr) Same as eeprom-read-i, but read number as i32 instead of float.
+"""
+    },
+    {
+        name = "loopfor",
+        comment = """
+(loopfor it start cond update body) For-loop. it is the iterator, start is what it is initialized to, cond is the condition that has the be true for the loop to continue running, update is how to update the iterator after each iteration and body is the code to execute each iteration. The iterator can be accessed from within body. Example: (loopfor i 0 (< i 5) (+ i 1) (print i) ) Output: 0 1 2 3 4 ; Remember that multiple statements in the loop require {} or progn: (loopfor i 0 (< i 5) (+ i 1) { (print i) (sleep 0.5) })
+"""
+    },
+    {
+        name = "loopwhile",
+        comment = """
+(loopwhile cond body) While-loop. cond is the condition that has the be true for the loop to continue running and body is the code to execute each iteration. Example: (define i 0) (loopwhile (< i 5) { (print i) (define i (+ i 1)) }) Output: 0 1 2 3 4 Another example that prints "Hello World" every two seconds: (loopwhile t { (print "Hello World") (sleep 2) })
+"""
+    },
+    {
+        name = "looprange",
+        comment = """
+(looprange it start end body) Range-loop. Iterate it from start to end and evaluate body for each iteration. The iterator it can be accessed from within body. Example: (looprange i 0 5 (print i) ) Output: 0 1 2 3 4 ; As with the other loops, multiple statements require {} or progn (looprange i 0 5 { (print i) (sleep 0.5) })
+"""
+    },
+    {
+        name = "loopforeach",
+        comment = """
+(loopforeach it lst body) ForEach-loop. Iterate over every element in the list lst and evaluate body for each iteration. The iterator it can be accessed from within body. Example: (loopforeach i '("AB" "C" "dE" "f") (print i) ) Output: AB C dE f ; As with the other loops, multiple statements require {} or progn (loopforeach i '("AB" "C" "dE" "f") { (print i) (sleep 0.5) })
+"""
+    },
+    {
+        name = "loopwhile-thd",
+        comment = """
+(loopwhile-thd stack cond body) While-loop that starts in a new thread. The argument stack is the stack-size of the thread, cond is the condition that has the be true for the loop to continue running and body is the code to execute each iteration. The difference from the regular loopwhile is that the evaluator will continue running the code after this one before this one finishes, as this loop is evaluated in a new thread. Example that forever prints "Hello World" every two seconds: (loopwhile-thd 100 t { (print "Hello World") (sleep 2) }) ; The above is equivalent to the following code (spawn 100 (fn () (loopwhile t { (print "Hello World") (sleep 2) }))) From firmware 6.06 it is possible to give the thread a name and/or a stack size. That gives the following combinations of possibilities: ; No name and default stack size (loopwhile-thd () t { (print "Hello World1") (sleep 2) }) ; No name and stack size 100 (loopwhile-thd 100 t { (print "Hello Worl2") (sleep 2) }) ; Name ThdTest and default stack size (loopwhile-thd "ThdTest" t { (print "Hello World3") (sleep 2) }) ; Name ThdTest2 and stack size 100 (loopwhile-thd ("ThdTest2" 100) t { (print "Hello World4") (sleep 2) })
+"""
+    },
+    {
+        name = "break",
+        comment = """
+(break retval) break can be used to break out of a loop and return retval (the result of the loop will be retval, otherwise the result of the loop will be the result of the last expression in it). break works in all of the loops above. Example: ; Below we make a function to determine if ; the list lst contains number num (defun contains (num lst) (loopforeach it lst (if (= it num) (break t) nil ))) (contains 346 '(12 33 452 11 22 346 99 12)) > t (contains 347 '(12 33 452 11 22 346 99 12)) > nil
+"""
+    },
+    {
+        name = "defun",
+        comment = """
+(defun (args) body) Shorthand macro for defining a function. Example: ; Create function f with argument x that prints x (defun f (x) (print x) ) ; The above is equivalent to (define f (lambda (x) (print x) ))
+"""
+    },
+    {
+        name = "defunret",
+        comment = """
+(defunret (args) body) Same as defun, but allows returning at any point. This one has a bit more overhead than defun as it uses call-cc internally, which is why both exist. (defunret test (a b) { (if (> a b) (return (+ a 5)) ) (+ a b) }) (test 2 2) > 4 (test 3 2) > 8
+"""
+    },
+    {
+        name = "map",
+        comment = """
+(map f lst) Apply function f to every element in list lst. Example: (map (fn (x) (* x 5)) '(1 2 3 4)) > (5 10 15 20) This example creates an anonymous function that takes one argument and returns that argument multiplied by 5. Map then applies it to every element in the list (1 2 3 4), which yields the list (5 10 15 20). In the later version of lispBM map is a "native" function, meaning that it is quite fast and efficient.
+"""
+    },
+    {
+        name = "range",
+        comment = """
+(range optStart end) Create a list from start to end, excluding end. Range also works with just one argument, which is takes as end assuming start is 0. Example: (range 2 8) > (2 3 4 5 6 7) (range 5) > (0 1 2 3 4)
+"""
+    },
+    {
+        name = "foldl",
+        comment = """
+(foldl f init lst) Apply the function f to pairs of init and each element of the list lst and accumulate the result. Example: (foldl + 0 '(1 2 3 4 5)) > 15
+"""
+    },
+    {
+        name = "foldr",
+        comment = """
+Same as foldl, but start from the right side of lst. Note that foldl is tail recursive but foldr is not, so if possible use foldl.
+"""
+    },
+    {
+        name = "reverse",
+        comment = """
+(reverse lst) Returns the list lst in reverse. Example: (reverse '(1 2 3 4 5)) > (5 4 3 2 1)
+"""
+    },
+    {
+        name = "length",
+        comment = """
+(length lst) Returns the length of list lst. Example: (length '(1 2 3)) > 3
+"""
+    },
+    {
+        name = "apply",
+        comment = """
+(apply f lst) Use the elements in list lst as arguments to function f. Example: (apply + '(1 2 3)) > 6
+"""
+    },
+    {
+        name = "zipwith",
+        comment = """
+(zipwith f x y) Apply the function f to pairs between the elements in list x and list y. Example: (zipwith * '(1 2 3) '(3 4 5)) > (3 8 15)
+"""
+    },
+    {
+        name = "filter",
+        comment = """
+(filter f lst) Filter list by keeping the elements on which f returns true. Example: (filter (fn (x) (< x 5)) '(3 9 5 8 2 4 7)) > (3 2 4)
+"""
+    },
+    {
+        name = "sort",
+        comment = """
+(sort f lst) Sort list lst using comparison function f. Example: (sort < '(5 6 2 1 5 63 33 7 7 8)) > (1 2 5 5 6 7 7 8 33 63) (sort > '(5 6 2 1 5 63 33 7 7 8)) > (63 33 8 7 7 6 5 5 2 1) ; Split sentence to words and sort them in ascending order (sort str-cmp-asc (str-split "this is a string" " ")) > ("a" "is" "string" "this") Note: Sort is quite slow the way it is implemented now. If sorting becomes a bottleneck in your application you can open an issue on github and hopefully someone will look into that and make a fast implementation. Update : Since firmware 6.05 sort is a built-in function that uses the merge sort algorithm. That makes it fast and it works well on large lists.
+"""
+    },
+    {
+        name = "str-from-n",
+        comment = """
+(str-from-n n optFormat) Create a string from the number n. Also takes an optional format argument optFormat that works in the same way as the printf-function in C. The optFormat argument can also be used together with other characters as long as the resulting output string is shorter than 100 characters. Example: (str-from-n 10) > "10" (str-from-n 2.5) > "2.500000" (str-from-n 2.5 "%.1f") > "2.5" (str-from-n 10 "0x%04X") ; Here we also append 0x in front of optFormat > "0x000A" (str-from-n 0.023e3) > "2.500000"
+"""
+    },
+    {
+        name = "str-join",
+        comment = """
+(str-join strings opt-delim) Joins a list of strings into one, with an optional delimeter string placed between each. Note: Passing in an empty list returns "" . Examples: (str-join '("a" "b" "c")) > "abc" (str-join '("I" "love" "lispbm!") " ") > "I love lispbm!" (str-join '() " ") > ""
+"""
+    },
+    {
+        name = "str-merge",
+        comment = """
+(str-merge str1 str2 ...) Merge a number of strings into one. Example: (str-merge "A" "bC" "D") > "AbCD" (str-merge "Num1: " (str-from-n 10) " Num2: " (str-from-n 2.1 "%.1f")) > "Num1: 10 Num2: 2.1"
+"""
+    },
+    {
+        name = "str-to-i",
+        comment = """
+(str-to-i str optBase) Convert string to integer. By default the base is chosen automatically, but it can also be specified. Example: (str-to-i "123") > {123} (str-to-i "a" 16) > {10} (str-to-i "0xa") ; Automatic base16 if str starts with 0x > {10}
+"""
+    },
+    {
+        name = "str-to-f",
+        comment = """
+(str-to-f str) Convert string to floating point number. Example: (str-to-f "2.5") > {2.500000} ; Also supports scientific notation (str-to-f "0.0025e3") > {2.500000}
+"""
+    },
+    {
+        name = "str-part",
+        comment = """
+(str-part str start optN) Take part of string str starting at start for optN characters. If optN is omitted the rest of str will be taken. Example: (str-part "Hello World!" 6) > "World!" (str-part "Hello World!" 6 2) > "Wo" (str-part "Hello World!" 0 2) > "He"
+"""
+    },
+    {
+        name = "str-split",
+        comment = """
+(str-split str delim) Split string str into tokens using delimiter delim. If delim is a number str will be split into tokens the size of that number. Example: (str-split "This is a test" " ") > ("This" "is" "a" "test") (str-split "this_o_is_o_a_o_test" "_o_") > ("This" "is" "a" "test") (str-split "This is a test" 3) > ("Thi" "s i" "s a" " te" "st") (str-split "This is a test" 1) > ("T" "h" "i" "s" " " "i" "s" " " "a" " " "t" "e" "s" "t")
+"""
+    },
+    {
+        name = "str-replace",
+        comment = """
+(str-replace str rep optWith) Replace every occurrence of rep in str with optWith. If optWith is omitted every rep will be removed. Example: (str-replace "Hello World!" "World" "LispBM") > "Hello LispBM!" (str-replace "Hello World!" " World") > "Hello!"
+"""
+    },
+    {
+        name = "str-to-upper",
+        comment = """
+(str-to-upper str) Convert string str to upper case. Example: (str-to-upper "TesTt") > "TESTT"
+"""
+    },
+    {
+        name = "str-to-lower",
+        comment = """
+(str-to-lower str) Convert string str to lower case. Example: (str-to-lower "TesTt") > "testt"
+"""
+    },
+    {
+        name = "str-cmp",
+        comment = """
+(str-cmp str1 str1 optN) Compare strings str1 and str2. Works in the same way as the strcmp-function in C, meaning that equal strings return 0 and different strings return their difference according how they would be sorted. The optional argument optN can be used to specify how many characters to compare (like strncmp in C). If it is left out all characters will be compared. Example: (str-cmp "Hello" "Hello") > 0 (str-cmp "Hello" "World") > -15 (str-cmp "World" "Hello") > 15 (str-cmp "ab" "abcd" 2) ; Compare only the first two characters > 0
+"""
+    },
+    {
+        name = "str-cmp-asc",
+        comment = """
+(str-cmp-asc str1 str1) Return true if str1 comes before str2, nil otherwise. Useful for sorting strings using the sort function in ascending order.
+"""
+    },
+    {
+        name = "str-cmp-dsc",
+        comment = """
+(str-cmp-dsc str1 str1) Return true if str2 comes before str1, nil otherwise. Useful for sorting strings using the sort function in descending order.
+"""
+    },
+    {
+        name = "str-len",
+        comment = """
+(str-len str) Calculate length of string str excluding the null termination. Example: (str-len "Hello") > 5
+"""
+    },
+    {
+        name = "str-find",
+        comment = """
+(str-find str substr [start] [occurrence] [direction]) Finds the index of the first character of a substring substr in the string str , returning this index, or -1 if it doesn't exist. substr can also be a list of strings, in which case a certain positon only needs to be equal to one of these substrings to be considered a match. If this list is empty, -1 is always returned, and searching for an empty string returns the starting index. Optional arguments: It is valid if the resulting start index is outside the range of str (i.e. being smaller than 0 or larger than the size of str ), in which case the expected behaviour is performed by either immediatly returning no match ( -1 ) or skipping the index forward to the first potentially valid match (depending on the direction). Note about byte arrays str is actually considered to be a byte array, meaning that the final terminating null byte is considered when searching. The final byte of substr is on the other hand removed before it is searched for. If you want to search for an abitrary byte sequence you must first increase the size of substr by one, for instance with (buf-resize substr 1 'copy) . Note however that since specifying start to be -1 starts the search at the last character (which is the second to last byte in a null-terminated string), it is impossible to specify that the search should start at the last byte ! (If you need that functionality, you'll unfortunately need to implement that yourself and only specify positive values for start .) This function actually replaces buf-find which existed in earlier versions of v6.05. This version is almost backwards compatible, so you should be able to just search and replace buf-find with str-find for most cases. The only change is that the third argument occurrence has been moved to the fourth position (with start taking the third). So you'll need to replace (buf-find buf seq x) with (str-find buf seq 0 x) in this case. Examples: (str-find "-str-" "str") > 1 (str-find "-str-str-" "str" 0 1) > 5 (str-find "-str-str-" "str" 2) > 5 (str-find "-str-str-" "str" 'left) > 5 (str-find "-ab-ab-" "ab" 5 'left) > 4 (str-find "-ab-ba-" '("ba" "ab") 0 1) > 4 (str-find "a--a" "a" -1 'left) > 3
+"""
+    },
+    {
+        name = "to-str",
+        comment = """
+(to-str arg1 ... argN) Convert LBM-types to their string representation and return that string. Example: (to-str '(1 2 3)) > "(1 2 3)" (to-str "aAa" 4 '(a 2 3) 2 3 "Hello") > "aAa 4 (a 2 3) 2 3 Hello"
+"""
+    },
+    {
+        name = "to-str-delim",
+        comment = """
+(to-str-delim delimiter arg1 ... argN) Same as to-str , but with a custom delimiter. Example: (to-str-delim "::" "aAa" 4 '(a 2 3) 2 3 "Hello") > "aAa::4::(a 2 3)::2::3::Hello"
+"""
+    },
+    {
+        name = "event-enable",
+        comment = """
+(event-enable event optEn) Enable or disable event. The optional argument optEn can be set to 1 to enable the event or to 0 to disable it. If optEn is left out the event will be enabled.
+"""
+    },
+    {
+        name = "buflen",
+        comment = """
+The length of a byte array can be read with (buflen arr) Which will return 20 for the array arr above.
+"""
+    },
+    {
+        name = "bufclear",
+        comment = """
+To clear a byte array the function bufclear can be used: (bufclear arr optByte optStart optLen) Where arr is the byte array to clear, optByte is the optional argument of what to clear with (default 0), optStart is the optional argument of which position to start clearing (default 0) and optLen is the optional argument of how many bytes to clear after start (default the entire array). Example: (bufclear arr) ; Clear all of arr (bufclear arr 0xFF) ; Fill arr with 0xFF (bufclear arr 0 5) ; Clear from index 5 to the end (bufclear arr 0 5 10) ; Clear 10 bytes starting from index 5 (bufclear arr 0xAA 5 10) ; Set 10 bytes to 0xAA starting from index 5
+"""
+    },
+    {
+        name = "bufget-x",
+        comment = """
+To read data from the byte array you can use (bufget-[x] arr index) Where [ x ] is i8, u8, i16, u16, i32, u32 or f32. Index is the position in the array to start reading from, starting at 0. Here are some examples (bufget-i8 arr 0) ; read byte 0 as int8 (bufget-i16 arr 0) ; read byte 0 and 1 as int16 (bufget-i32 arr 0) ; read byte 0 to 3 as i32 (bufget-u8 arr 0) ; read byte 0 as uint8 (bufget-u16 arr 0) ; read byte 0 and 1 as uint16 (bufget-u24 arr 0) ; read byte 0, 1 and 2 as uint24 (bufget-u32 arr 0) ; read byte 0 to 3 as uint32 (bufget-f32 arr 0) ; read byte 0 to 3 as float32 (IEEE 754) By default the byte order is big endian. The byte order can also be specified as an extra argument. E.g. to read 4 bytes as int32 from position 6 in little endian you can use (bufget-i32 arr 6 'little-endian)
+"""
+    },
+    {
+        name = "bufset-x",
+        comment = """
+Writing to the array can be done in a similar way (bufset-[x] arr index value) Here are some examples (bufset-i8 arr 0 12) ; write 12 to byte 0 as int8 (bufset-i16 arr 0 -5621) ; write -5621 to byte 0 and 1 as int16 (bufset-i32 arr 0 2441) ; write 2441 to byte 0 to 3 as i32 (bufset-u8 arr 0 12) ; write 12 to byte 0 as uint8 (bufset-u16 arr 0 420) ; write 420 to byte 0 and 1 as uint16 (bufset-u24 arr 0 420) ; write 420 to byte 0, 1 and 2 as uint24 (bufset-u32 arr 0 119) ; write 119 to byte 0 to 3 as uint32 (bufset-f32 arr 0 3.14) ; write 3.14 to byte 0 to 3 as float32 (IEEE 754) (bufset-bit arr 14 1) ; Set bit 14 to 1 (note that this is a bitindex) As with bufget big endian is the default byte order and little-endian can be passed as the last argument to use little-endian byte order instead.
+"""
+    },
+    {
+        name = "bufcpy",
+        comment = """
+Copy part of one array into another array. (bufcpy arr1 ind1 arr2 ind2 len) Copy len bytes from arr2 starting at ind2 to arr1 starting at ind1 . len will be truncated to ensure that nothing is read or written outside of the arrays.
+"""
+    },
+    {
+        name = "free",
+        comment = """
+Byte arrays will be de-allocated by the garbage collector on a regular basis, but can still use a lot of memory until then and large byte arrays cause a risk of running out of memory. It is possible to manually de-allocate the byte arrays when done with them by calling free (free arr) This will clear the allocated memory for arr . Note: Strings in lispBM are treated the same as byte arrays, so all of the above can be done to the characters in strings too.
+"""
+    },
+    {
+        name = "buf-resize",
+        comment = """
+(buf-resize arr delta-size opt-absolute-size opt-copy-symbol) Change the length of array arr in bytes. A reference to arr is returned. This extension can be used in two modes: Passing nil to delta-size while not passing any value for opt-absolute-size will result in an eval_error . You can optionally pass the symbol 'copy to opt-copy-symbol to specify that arr should be left unchanged and that a copy should instead be made. Don't worry about the exact position of the argument, the only important part is that opt-copy-symbol is last. So you can give a value for opt-copy-symbol even when opt-absolute-size isn't passed. You can also for completeness pass the symbol 'mut to specify that the standard behaviour of modifying arr in place should remain in effect. When growing the length of the array a new range will be allocated and the old data copied over. The new bytes will be initialised to zero. If the new length of the array is smaller than the previous the allocated range will simply be marked as smaller in an efficient manner which avoids any new allocations. It is possible to shrink an array to a length of zero. Note: The array will be resized in place. The returned reference to arr is just for convenience. (Unless opt-copy-symbol is 'copy of course.) Example where we remove the terminating null byte from a string buffer: (buf-resize "hello" -1) > [104 101 108 108 111] Example where we increase the length of buf to 5: (def buf [1 2 3 4]) (buf-resize buf nil 5) (bufset-u8 buf 4 5) ; we set it to avoid LBM printing the array as a string (print buf) > [1 2 3 4 5] Example where we create a copy of name with the terminating null byte removed. (def name "name") (def name-array (buf-resize name -1 'copy)) (print name) > "name" (print name-array) > [110 97 109 101]
+"""
+    },
+    {
+        name = "import",
+        comment = """
+(import filename binding) Load filename as a byte array and bind it to binding. Note that import must be on its own line and that every line can only have one import. Example: Load native library (import "ws2812.bin" 'ws2812) ; Import the native ws2812 library. This creates the byte array ws2812 that can be used usual. (load-native-lib ws2812); Load it to get the extensions it provides
+"""
+    },
+    {
+        name = "load-native-lib",
+        comment = """
+(load-native-lib lib) Load the native library lib. lib is a byte array with the compiled binary that is created after running make on the native library.
+"""
+    },
+    {
+        name = "unload-native-lib",
+        comment = """
+(unload-native-lib lib) Unload the native library lib. This is done automatically when lispBM is stopped or restarted, so there is no need to do it explicitly. This function is provided in case native libraries need to be explicitly loaded and unloaded while the same program is running.
+"""
+    },
+    {
+        name = "Native Library Example",
+        comment = """
+This example creates an extension called ext-test that takes a number as an argument and returns the number multiplied by 3. The code for it can be found in this diretory . ; When running make in the example directory a file called example.lisp ; with this array is created. (def example [ 0x00 0x00 0x00 0x00 0x08 0xb5 0x07 0x4b 0x07 0x49 0x08 0x48 0x7b 0x44 0x79 0x44 0x1b 0x68 0x03 0x4b 0x78 0x44 0x1b 0x68 0x98 0x47 0x01 0x20 0x08 0xbd 0x00 0xbf 0x00 0xf8 0x00 0x10 0xf0 0xff 0xff 0xff 0x2b 0x00 0x00 0x00 0x18 0x00 0x00 0x00 0x65 0x78 0x74 0x2d 0x74 0x65 0x73 0x74 0x00 0x00 0x00 0x00 0x01 0x29 0x70 0xb5 0x05 0x46 0x09 0x4c 0x0d 0xd1 0xe3 0x6f 0x00 0x68 0x98 0x47 0x48 0xb1 0x63 0x6e 0x28 0x68 0x26 0x6c 0x98 0x47 0x33 0x46 0x00 0xeb 0x40 0x00 0xbd 0xe8 0x70 0x40 0x18 0x47 0xd4 0xf8 0x94 0x00 0x70 0xbd 0x00 0xf8 0x00 0x10 ]) ; The array can be loaded like this (load-native-lib example) ; Now an extension called ext-test is available. Here we use it ; with the argument 4 and print the result (print (ext-test 4)) ; Should print 12
+"""
+    },
+    {
+        name = "uavcan-last-rawcmd",
+        comment = """
+(uavcan-last-rawcmd canInterface) Get the last raw uavcan-command and its age. Returns a list where the first element is the value and the second element is the age. canInterface is the interface, which can be 1 or 2. Interface 2 is only valid if the hardware has dual CAN-buses. Example: (print (ix (uavcan-last-rawcmd 1) 0)) ; Print the value (print (ix (uavcan-last-rawcmd 1) 1)) ; Print the age in seconds
+"""
+    },
+    {
+        name = "uavcan-last-rpmcmd",
+        comment = """
+(uavcan-last-rpmcmd canInterface) Same as uavcan-last-rawcmd, but for the last rpm-command.
+"""
+    },
+    {
+        name = "lbm-set-quota",
+        comment = """
+(lbm-set-quota quota-us) Set how many microseconds to run each thread between context switches. Default is 2000. A lower value will alter between threads more often, reducing latency between context switches at the cost of overall performance. The default value of 2000 has relatively low performance overhead. Lowering this value is useful if there are one or more timing-critical threads (that e.g. read encoders) that cannot wait too long between iterations.
+"""
+    },
+    {
+        name = "lbm-set-gc-stack-size",
+        comment = """
+(lbm-set-gc-stack-size new-size) Change the stack size for the garbage collector. If the GC stack is too small the program can crash during garbage collection and print a message stating that it ran out of GC stack. If that happens increasing the size from the default of 160 can help. Note that the GC stack is on LBM memory and increasing its size leaves less memory available for other things.
+"""
+    },
+    {
+        name = "image-save",
+        comment = """
+(image-save) Save everything in the global environment in an image. Returns true on success and nil on failure. This function can fail if defrag memory pools are present in the global environment as these cannot be flattened. Instead, they should be created in the main-function of the program. This function will also fail if a main-function is missing. After calling image-save, the next time lbm is started (such as at the next boot) the environment at the point where image-save was called will be re-created and the main-function will be called. This bypasses the reader on the next boot, which speeds up the boot-time greatly (on large programs from several seconds to a few milliseconds). It also makes it much easier to use const-blocks as one does not have to take care for the reader to always create everything in the same order. One has to take care to move everything that alters the external state of the hardware, such as initializing drivers and io-pins, into the main-function as this state won't be restored when loading the image. This might sound strange in this context, but keep in mind that it is what you always do when writing regular C-programs on embedded hardware - when you enter main you initialize everything and start your threads and main loop. When building something battery-powered like a BMS that wakes up from sleep regularly to check things image-save is very useful as it is critical to boot fast to conserve power. A fast boot also improves the user experience in general. Example: (defun test (a) { (print (list "Arg:" a)) }) (defun main () { (loopwhile t { (test 123) (sleep 1) }) }) (image-save) ; This is only needed in order to start the program before rebooting. Without ; calling main here one has to reboot or restart lbm after stream or upload in ; order to call main. (main)
+"""
+    },
+    {
+        name = "plot-init",
+        comment = """
+(plot-init namex namey) Start a new plot with namex as the x axis name and namey as the u axis name.
+"""
+    },
+    {
+        name = "plot-add-graph",
+        comment = """
+(plot-add-graph name) Add a graph to the current plot that will be called name. Every added graph gets a new index, starting from 0.
+"""
+    },
+    {
+        name = "plot-set-graph",
+        comment = """
+(plot-set-graph ind) Set graph index to which data points are sent.
+"""
+    },
+    {
+        name = "plot-send-points",
+        comment = """
+(plot-send-points x y) Send a xy-point to the selected graph in the plot.
+"""
+    },
+    {
+        name = "ioboard-get-adc",
+        comment = """
+(ioboard-get-adc can-id channel) Read ADC-input channel from IO-board with can-id. Channel range: 1 to 8. If the IO-board with can-id is not present on the CAN-bus or if the channel is missing -1 will be returned.
+"""
+    },
+    {
+        name = "ioboard-get-digital",
+        comment = """
+(ioboard-get-digital can-id channel) Read digital input channel from IO-board with can-id. Channel range: 1 to 64. If the IO-board with can-id is not present on the CAN-bus or if the channel is missing -1 will be returned.
+"""
+    },
+    {
+        name = "ioboard-set-digital",
+        comment = """
+(ioboard-set-digital can-id channel state) Write digital output channel to IO-board with can-id. State can be 1 or 0.
+"""
+    },
+    {
+        name = "ioboard-set-pwm",
+        comment = """
+(ioboard-set-pwm can-id channel duty) Write PWM-output channel to IO-board with can-id. The value duty can be 0.0 to 1.0.
+"""
+    },
+    {
+        name = "log-config-field",
+        comment = """
+(log-config-field can-id field-ind key name unit precision is-relative is-timestamp ) Configure log field on log device. Parameters: can-id ID on the CAN-bus. Setting the id to -1 will send the data to VESC Tool. On the express platform -2 will log to the local SD-card. field-ind Field index in the log. key Keyword string. name Name string. unit Unit string. precision Number of decimals. is-relative Relative fields are displayed relative to the start value of the log. is-timestamp Timestamp fields are displayed with the format hh:mm:ss.
+"""
+    },
+    {
+        name = "log-start",
+        comment = """
+(log-start can-id field-num rate-hz append-time apped-gnss ) Start logging. Before starting to log all fields should be configured with log-config-field . can-id ID on the CAN-bus. Setting the id to -1 will send the data to VESC Tool. On the express platform -2 will log to the local SD-card. field-num Number of log fields. rate-hz Log rate in Hz. append-time If set to true the log device will append a timestamp to each sample. append-gnss If set to true the log device will append a GNSS-position to each sample. This requires a GNSS-receiver on the log device and the log will not start until a valid position is available.
+"""
+    },
+    {
+        name = "log-stop",
+        comment = """
+(log-stop can-id) Stop logging data on log device with can-id. The id -1 refers to VESC Tool and id -2 refers to the local express.
+"""
+    },
+    {
+        name = "log-send-f32",
+        comment = """
+(log-send-f32 can-id from-field-ind sample1 ... sampleN) Send log samples to log device with can-id. This function takes 1 to 100 samples as arguments which will be applied to the log fields starting from from-field-ind. The samples can be numbers or lists of numbers. Setting the id to -1 will send the data to VESC Tool and setting id to -2 will store it locally on the express.
+"""
+    },
+    {
+        name = "log-send-f64",
+        comment = """
+(log-send-f64 can-id from-field-ind sample1 ... sampleN) Same as log-send-f32 but uses 64-bit values for higher precision and takes up to 50 samples. Useful for e.g. gnss-positions where 32-bit floats do not give enough precision due to the size of the earth.
+"""
+    },
+    {
+        name = "gnss-lat-lon",
+        comment = """
+(gnss-lat-lon) Returns the latitude and longitude of the position as a list with two elements.
+"""
+    },
+    {
+        name = "gnss-height",
+        comment = """
+(gnss-height) Returns the height of the position in meters.
+"""
+    },
+    {
+        name = "gnss-speed",
+        comment = """
+(gnss-speed) Returns the speed on meters per second.
+"""
+    },
+    {
+        name = "gnss-hdop",
+        comment = """
+(gnss-hdop) Returns the hdop-value of the position. Lower values mean that the precision is better.
+"""
+    },
+    {
+        name = "gnss-date-time",
+        comment = """
+(gnss-date-time) Returns date and time of the last position sample as a list with the format (year month day hours minutes seconds milliseconds).
+"""
+    },
+    {
+        name = "gnss-age",
+        comment = """
+(gnss-age) Returns the age of the last gnss-sample in seconds.
+"""
+    },
+    {
+        name = "ublox-init",
+        comment = """
+(ublox-init optRateMs optUartNum optPinRx optPinTx) Re-initializes the ublox gnss-module. Returns true on success and nil on failure. Nil most likely means that something is wrong with the connection. The optional argument optRateMs can be used to set the navigation rate in milliseconds. By default 500 ms us used. Not any navigation rate is possible, it depends on the ublox module in use. Common rates that can work are 100, 200, 500, 1000 and 2000 ms. The optional arguments optUartNum, optPinRx and optPinTx can be used to specify the UART peripheral and pins. optUartNum can be 0 or 1 and the pins can be any valid ESP-pins.
+"""
+    },
+    {
+        name = "nmea-parse",
+        comment = """
+(nmea-parse str) Parse NMEA string and updates GNSS state. Supported strings are GGA, GPGSV, GLGSV and RMC. Other strings are ignored. Returns true when something was parsed, nil otherwise. All of the GNSS-extensions as well as the logging can take advantage of these updates. CAN-messages for GNSS position and time will also be sent out based on the updates.
+"""
+    },
+    {
+        name = "set-pos-time",
+        comment = """
+(set-pos-time lat lon height speed hdop msToday year month day) Update position, date and time state. All arguments are optional and nil can be passed for arguments that should not be updated. The arguments are interpreted as follows: All of the GNSS-extensions as well as the logging can take advantage of these updates. CAN-messages for GNSS position and time will also be sent out based on the updates. Examples (var hh 10) (var mm 25) (var ss 10) (var ms-today (+ (* hh 60 60 1000) (* mm 60 1000) (* ss 1000) )) ; Set time and data only (set-pos-time nil nil nil nil nil ms-today 2025 02 02) ; Set position only (set-pos-time 57.623761 13.091890 10 0.0 2)
+"""
+    },
+    {
+        name = "cmds-start-stop",
+        comment = """
+(cmds-start-stop optStart) Start or stop commands interface. The commands interface needs to be started for the extensions and related events to work. This will allocate around 4k (Express) or 3k (ESC) of memory for the packet interface and for the commands processing thread stack. When stopping the allocated memory will be freed. The optional argument optStart can be set to true for start or to false for stop. If it is left out the commands interface will be started.
+"""
+    },
+    {
+        name = "cmds-proc",
+        comment = """
+(cmds-proc data) Process data byte array with the packet decoder. If a full command is decoded a C thread will be spawned that executes the command. If the command has a response to send this is done using the event-cmds-data-tx event. The best way to illustrate how to use this is with an example. The following code uses TCP sockets on VESC Express to connect to the VESC TCP hub. VESC Tool can then connect to this express using the TCP Hub and run all commands as usual. It should be fairly simple to adapt this example to for example interface with an LTE modem. ; Connect to VESC TCP hub (def socket (tcp-connect "veschub.vedder.se" 65101)) ; Register with username user11 and password pass11 (tcp-send socket "VESC:user11:pass11\n") (defun event-handler () { (set-mailbox-size 3) (loopwhile t (recv ((event-cmds-data-tx (? data)) (tcp-send socket data)) (_ nil) )) }) (event-register-handler (spawn event-handler)) (event-enable 'event-cmds-data-tx) (cmds-start-stop true) (loopwhile t { (cmds-proc (tcp-recv socket 512 100 false)) })
+"""
+    },
+    {
+        name = "esp-now-start",
+        comment = """
+(esp-now-start) Start ESP-NOW. This must be run before further ESP-NOW operations.
+"""
+    },
+    {
+        name = "esp-now-add-peer",
+        comment = """
+(esp-now-add-peer peer optRate) Add peer. The argument is a list with the mac address of the peer to add. This must be run before esp-now-send as it only is possible to send data to peers that have been added. Example: (esp-now-add-peer '(255 255 255 255 255 255)) ; Add broadcast address as peer The optional argument optRate (added in FW6.06) sets the wifi bitrate when sending data to this peer. By default it is 1 Mbps. The rate argument is a number between -1 and 15 with the following meaning: -1: Keep default Rate 0 : 1 Mbps with long preamble 1 : 2 Mbps with long preamble 2 : 5.5 Mbps with long preamble 3 : 11 Mbps with long preamble 4 : ???? Missing in ESP doc 5 : 2 Mbps with short preamble 6 : 5.5 Mbps with short preamble 7 : 11 Mbps with short preamble 8 : 48 Mbps 9 : 24 Mbps 10: 12 Mbps 11: 6 Mbps 12: 54 Mbps 13: 36 Mbps 14: 18 Mbps 15: 9 Mbps
+"""
+    },
+    {
+        name = "esp-now-del-peer",
+        comment = """
+(esp-now-del-peer peer) Delete peer. There is a limit to how many peers can be added, so if adding another peer does not work old peers can be deleted to free up resources. (esp-now-del-peer '(255 255 255 255 255 255)) ; Remove broadcast peer
+"""
+    },
+    {
+        name = "esp-now-send",
+        comment = """
+(esp-now-send peer data) Send the array data to peer. The peer argument is a list with the mac address of the peer to send to. If peer is not the broadcast address this function will make a few retries and returns true if the packet arrived at the receiver and false if it was not received. For broadcast only one try is made and it should always return true. Example: (esp-now-send '(255 255 255 255 255 255) "Hello!") ; Broadcast the string "Hello!"
+"""
+    },
+    {
+        name = "esp-now-recv",
+        comment = """
+(esp-now-recv optTimeout) Block current thread until esp-now data arrives. The optional argument optTimeout can be used to specify a timeout in seconds. If a timeout occurs the symbol timeout will be returned, otherwise a list with the following format will be returned: (src-mac-addr dest-mac-addr payload-array rssi-db) Usage example: (esp-now-start) (print (esp-now-recv)) > ((112 4 29 15 194 105) (16 145 168 52 203 121) "Test" -40)
+"""
+    },
+    {
+        name = "get-mac-addr",
+        comment = """
+(get-mac-addr) Get the mac address of the device as a list. This address is what peer refers to in the functions above. Example: (get-mac-addr) > (112 4 29 15 194 105)
+"""
+    },
+    {
+        name = "wifi-get-chan",
+        comment = """
+(wifi-get-chan) Get the current wifi-channel. For ESP-NOW to work the communicating devices need to be on the same wifi-channel. By default the channel is 1, but when station mode is used on the wifi the channel will be the same as the access point and cannot be changed.
+"""
+    },
+    {
+        name = "wifi-set-chan",
+        comment = """
+(wifi-set-chan channel) Set the current wifi-channel. This function cannot be used when wifi is connected.
+"""
+    },
+    {
+        name = "wifi-get-bw",
+        comment = """
+(wifi-get-bw) Get current wifi bandwidth in MHz.
+"""
+    },
+    {
+        name = "wifi-set-bw",
+        comment = """
+(wifi-set-bw) Set wifi bandwidth in MHz. This function is experimental and should only be used if you know what you are doing.
+"""
+    },
+    {
+        name = "wifi-stop",
+        comment = """
+(wifi-stop) Stop wifi-driver. Reduces power consumption.
+"""
+    },
+    {
+        name = "wifi-start",
+        comment = """
+(wifi-start) Start wifi-driver. Re-connects to networks that were connected before. Can be used to restart wifi after sleep-light.
+"""
+    },
+    {
+        name = "f-connect",
+        comment = """
+(f-connect pin-mosi pin-miso pin-sck pin-cs optSpiSpeed) Connect SD-card on pin-mosi, pin-miso, pin-sck and pin-cs. The optional argument optSpiSpeed can be used to specify the SPI speed (default 20000 Hz). Returns true on success, nil otherwise. NOTE This is only needed if you connect a memory card manually to hardware that does not come with one. Hardware such as the VESC Nanolog already has the memory card connected and initialized, so you can use the file operations right away.
+"""
+    },
+    {
+        name = "f-connect-nand",
+        comment = """
+(f-connect-nand pin-mosi pin-miso pin-sck pin-cs optSpiSpeed) Connect NAND-flash memory on pin-mosi, pin-miso, pin-sck and pin-cs. The optional argument optSpiSpeed can be used to specify the SPI speed (default 20000 Hz). Returns true on success, nil otherwise.
+"""
+    },
+    {
+        name = "f-disconnect",
+        comment = """
+(f-disconnect) Disconnect SD-card or NAND-Flash.
+"""
+    },
+    {
+        name = "f-open",
+        comment = """
+(f-open path mode) Open a file in open-mode mode (r, w, a, r+, w+ and a+). Returns a number that can be used as a handle to the file on success or nil if the file could not be opened. The modes mean the following Example: (def f (f-open "test.txt" "w")) ; Open test.txt in write-only mode and store the handle as f.
+"""
+    },
+    {
+        name = "f-close",
+        comment = """
+(f-close file) Close file. The argument file is the handle returned by f-open.
+"""
+    },
+    {
+        name = "f-read",
+        comment = """
+(f-read file size) Read up to size bytes from file. Returns an array with the read data. Successive calls to f-read will move the file position forwards. If the returned array is smaller than the size-argument it means that the end of the file was reached. When calling read after reaching the end if the file nil is returned.
+"""
+    },
+    {
+        name = "f-readline",
+        comment = """
+(f-readline file maxlen) Read one line from file. At most maxlen bytes will be read. If maxlen is set too high this function will fail as it needs to pre-allocate enough memory to fit maxlen. This function advances the file position, so successive calls to it can be used to read the file line-by-line. When the end of the file is reached nil is returned.
+"""
+    },
+    {
+        name = "f-write",
+        comment = """
+(f-write file buf) Write array buf to file. This will advance the file position by the size of buf.
+"""
+    },
+    {
+        name = "f-tell",
+        comment = """
+(f-tell file) Get the current position in the file.
+"""
+    },
+    {
+        name = "f-seek",
+        comment = """
+(f-seek file pos) Seek to position pos in file. If pos is a negative number the seek is done from the end of the file.
+"""
+    },
+    {
+        name = "f-mkdir",
+        comment = """
+(f-mkdir path) Make directory on path.
+"""
+    },
+    {
+        name = "f-rm",
+        comment = """
+(f-rm path) Remove path recursively. If path is a file just the file is removed and if it is a directory that directory and all its content will be removed recursively.
+"""
+    },
+    {
+        name = "f-ls",
+        comment = """
+(f-ls path opt-count opt-offset opt-size) List all files and directories in path. Returns a list with the entries; each entry is a list where the first element is the name and the second element is true for directories and nil for files. If the optional argument 'size is passed each entry in the list also has the size at the end. For directories the size says how many entries that directory has and for files it says what size the file has in bytes. The optional argument opt-count can be used to specity a maximum number of elemets to list and the optional argument opt-offset sets how many elemnts to skip in the beginning. This can be useful if a directory has so many entries that the file list risks using too much memory. Example: (f-ls "") > (("testsize.bin" nil) ("test.txt" nil) ("old_logs" t)) (f-ls "" 'size) > (("testsize.bin" nil 100) ("test.txt" nil 7) ("old_logs" t 47)) (f-ls "" 2) > (("testsize.bin" nil) ("test.txt" nil)) (f-ls "" 2 1) > (("test.txt" nil) ("old_logs" t)) (f-ls "" 2 1 'size) > (("test.txt" nil 7) ("old_logs" t 47))
+"""
+    },
+    {
+        name = "f-size",
+        comment = """
+(f-size file) Get the size of a file in bytes. File can be a path (e.g. "test.txt") or a file pointer opened with f-open.
+"""
+    },
+    {
+        name = "f-rename",
+        comment = """
+(f-rename oldname newname) Rename file (same as moving a file). Returns true on success, nil otherwise.
+"""
+    },
+    {
+        name = "f-sync",
+        comment = """
+(f-sync file) Write buffered changes to the memory card.
+"""
+    },
+    {
+        name = "f-fatinfo",
+        comment = """
+(f-fatinfo) Returns a list where the first element is the free space on the file system and the second element is the total size of the file system. Unit: MB. Example: (f-fatinfo) > (30298 30417)
+"""
+    },
+    {
+        name = "fw-erase",
+        comment = """
+(fw-erase size optCanId) Erase firmware-buffer. This is required before writing the firmware. Returns true on success or nil/timeout on failure. If the optional argument optCanId is omitted or set to -1 the command is performed locally, otherwise it is performed on the CAN-device with id optCanId.
+"""
+    },
+    {
+        name = "fw-write",
+        comment = """
+(fw-write offset data optCanId) Write data to firmware-buffer at offset. Returns true on success or nil/timeout on failure. If the optional argument optCanId is omitted or set to -1 the command is performed locally, otherwise it is performed on the CAN-device with id optCanId.
+"""
+    },
+    {
+        name = "fw-reboot",
+        comment = """
+(fw-reboot optCanId) Reboot and attempt to load the new firmware from the firmware-buffer using the bootloader. This function always returns true as there is no easy way to get the response from the bootloader. If the optional argument optCanId is omitted or set to -1 the command is performed locally, otherwise it is performed on the CAN-device with id optCanId.
+"""
+    },
+    {
+        name = "fw-info",
+        comment = """
+(fw-info optCanId) Get an assoc-list containing information about the VESC version number and git commit hashes. If optCanId is -1 or not given the local device is queried. If the target device does not run a recent enough firmware that supports this, or if the CAN bus is otherwise non-functional, this function will timeout after 2 seconds returning the symbol timeout . The returned assoc-list has the following structure: ( ('version . (majorNumber minorNumber)) ('test-version . number) ('commit . str) ('user-commit . str-or-nil) ) The test versions exact semantics depend on which firmware is running on the queried device, but on bldc for instance it is the beta version number. The user commit hash can be configured when you are compiling any of the VESC firmwares yourself, and is useful when you have a separate project that is using any of the VESC firmwares as a dependency, you can then configure it to be the commit of said project. If it was not configured when building it is instead set to nil . Unfortunately there is currently no documentation written anywhere for how to set it, but here are the relevant lines of code in bldc's makefile , and here they are in vesc_express's CMake configuration . Similar flags exist for vesc_bms_fw and vesc_gpstm . Example where we queried a bldc unit with the CAN id 10 running a development build of v6.6 beta 3: (fw-info 10) > ((version 6u 6u) (test-version . 3u) (commit . "4f2df650c4ed6d820657217e966d1dbd6c2c01e6") (user-commit . nil))
+"""
+    },
+    {
+        name = "fw-data",
+        comment = """
+(fw-data optOffset optLen) Get the firmware data partition as an array. The optional argument optOffset can be used to specify an offset in the partition and the optional argument optLen can be used to specify the length. By default the offset is 0 and the length is the entire firmware buffer (around 1.5 MB). Note that this array is read-only, so do not try to write directly to it! It is however possible to write to it using fw-write-raw if fw-erase has been performed first. After the erase each byte can be written to once, in any order. Example: ; An array with the first 10 bytes of the firmware buffer (def fwd (fw-data 0 10)) ; Erase at least 100 bytes (fw-erase 100) ; Write 1 to 10 to the beginning of the firmware buffer. (fw-write-raw 0 [1 2 3 4 5 6 7 8 9 10]) ; Print the array (print fwd)
+"""
+    },
+    {
+        name = "fw-write-raw",
+        comment = """
+(fw-write-raw offset data) Write data to firmware-buffer at offset. Returns true on success or nil on failure. Unlike fw-write, this function writes directly to the firmware buffer without an offset shift and it supports writing more than 500 bytes at a time.
+"""
+    },
+    {
+        name = "lbm-erase",
+        comment = """
+(lbm-erase optCanId) Erase lisp-code. This is required before writing new code. Returns true on success or nil/timeout on failure. If the optional argument optCanId is omitted or set to -1 the command is performed locally, otherwise it is performed on the CAN-device with id optCanId.
+"""
+    },
+    {
+        name = "qml-erase",
+        comment = """
+(qml-erase optCanId) Erase qml-code. This is required before writing new code. Returns true on success or nil/timeout on failure. If the optional argument optCanId is omitted or set to -1 the command is performed locally, otherwise it is performed on the CAN-device with id optCanId.
+"""
+    },
+    {
+        name = "lbm-write",
+        comment = """
+(lbm-write offset data optCanId) Write data to lbm-buffer at offset. Returns true on success or nil/timeout on failure. If the optional argument optCanId is omitted or set to -1 the command is performed locally, otherwise it is performed on the CAN-device with id optCanId.
+"""
+    },
+    {
+        name = "qml-write",
+        comment = """
+(qml-write offset data optCanId) Write data to qml-buffer at offset. Returns true on success or nil/timeout on failure. If the optional argument optCanId is omitted or set to -1 the command is performed locally, otherwise it is performed on the CAN-device with id optCanId.
+"""
+    },
+    {
+        name = "lbm-run",
+        comment = """
+(lbm-run running optCanId) Run or stop the lbm-code (run if running is 1, stop otherwise). Returns true on success or nil/timeout on failure. If the optional argument optCanId is omitted or set to -1 the command is performed locally, otherwise it is performed on the CAN-device with id optCanId. If running is set to 1 and LispBM already is running a restart is performed.
+"""
+    },
+    {
+        name = "rgbled-init",
+        comment = """
+(rgbled-init pin optTiming) Initialize the rgbled-driver on pin. If the driver already is initialized it will be de-initialized first. The optional argument optTiming can be used to specify the timing of the bitstream. Leaving it out is the same as setting it to 0.
+"""
+    },
+    {
+        name = "rgbled-deinit",
+        comment = """
+(rgbled-deinit) De-initialize the rgbled-driver and release the resources it used. If data is currently sent to the LEDs this function will block until that is done.
+"""
+    },
+    {
+        name = "rgbled-buffer",
+        comment = """
+(rgbled-buffer num-leds optLedType optGammaCorr) Creates an LED-buffer for num-leds leds. The optional argument optLedType specifies the type of LEDs. If it is omitted type 0 (GRB) is used. The available types are: The optional argument optGammaCorr can be set to enable gamma correction for this LED-buffer. Gamma correction makes the brightness non-linear matching the response of human eyes. Generally that makes colors look better and it is something that all monitors do. The downside is that fewer distinct colors are available as not all bits can be used. Example: ; Create a buffer for 10 GRBW-LEDs (def strip1 (rgbled-buffer 10 2)) ; Create a buffer for 10 GRB-LEDs with gamma-correction enabled (def strip2 (rgbled-buffer 10 0 1))
+"""
+    },
+    {
+        name = "rgbled-color",
+        comment = """
+(rgbled-color buffer led-num color optBrightness) Set LED led-num to color in buffer. The color is a number in WRGB8888 format, alternatively a list of numbers in WRGB8888 format. When a list of numbers is used all colors after led-num will be set to the corresponding colors in the list. When the white color is used the type must be u32 as all 32 bits are needed then. Buffer must be created with rgbled-buffer. Example: ; Create led-buffer and bind it to strip1 (def strip1 (rgbled-buffer 10 2)) ; Set the first LED to red (rgbled-color strip1 0 0x00FF0000u32) ; Set the second LED to white (rgbled-color strip1 1 0xFF000000u32) ; Set the second LED to white with 30 % brightness (rgbled-color strip1 1 0xFF000000u32 0.3) ; Set LED 4 to white, LED 5 to red and LED 6 to green, all at 40 % brightness (rgbled-color strip1 4 '(0xFF000000u32 0x00FF0000u32 0x0000FF00u32) 0.4) Note: This function only updates the color in the buffer. To show the new color the function rgbled-update must be used.
+"""
+    },
+    {
+        name = "rgbled-update",
+        comment = """
+(rgbled-update buffer) Send buffer to the LEDs.
+"""
+    },
+    {
+        name = "Multiple LED-strips",
+        comment = """
+It is possible to use multiple pins to drive different LED-strips. Even different types of LEDs can be used on the different pins. To do that more than one buffer can be used and rgbled-init can be used to move the driver to a different pin. Example: ; In this example a strip with 10 GRBW-LEDs is connected to ; pin 20 and another strip with 10 GRB-LEDs is conneced to pin 21. ; Buffer for 10 GRBW-LEDs (def strip1 (rgbled-buffer 10 2)) ; Buffer for 10 GRB-LEDs (def strip2 (rgbled-buffer 10 0)) ; Write some colors to the buffers of the ; two strips (rgbled-color strip1 0 0x330000) (rgbled-color strip1 1 0x22000000u32) (rgbled-color strip1 9 0x003311) (rgbled-color strip2 0 0x330000) (rgbled-color strip2 1 0x22000000u32) (rgbled-color strip2 6 0x330011) ; Start the driver on pin 20 and send the first buffer (rgbled-init 20) (rgbled-update strip1) ; Now move the driver to pin 21 and send the other buffer. This ; function will block until the previous update has finished. (rgbled-init 21) (rgbled-update strip2)
+"""
+    },
+    {
+        name = "color-make",
+        comment = """
+(color-make red green blue optWhite) Make color from individual color components. The components can be expressed in 0 to 255 or as floating point 0.0 to 1.0 (in any combination). optWhite is an optional argument for the white component, which often is used in RGBW LED-strips. Example: (color-make 37 150 90) ; Creates the color 0x2596be (color-make 0.146 0.59 0.747) ; Creates the color 0x2596be
+"""
+    },
+    {
+        name = "color-split",
+        comment = """
+(color-split color optMode) Split color into a list of components. The optional argument optMode can be used to define how the color is split. The options are: Example: (color-split 0x123456) > (18 52 86) (color-split 0x123456 1) > (18 52 86 0) (color-split 0x50123456u32 1) > (18 52 86 80) (color-split 0x123456 2) > (0.070588f32 0.203922f32 0.337255f32) (color-split 0x123456 3) > (0.070588f32 0.203922f32 0.337255f32 0.000000f32) (color-split (color-make 123 250 99)) > (123 250 99)
+"""
+    },
+    {
+        name = "color-mix",
+        comment = """
+(color-mix color1 color2 ratio) Mix color1 with color2 with mix-ratio ratio. Ratio has a range of 0.0 to 1.0. Ratio 0.0 will result in color1 and ratio 1.0 will result in color2. The argument color1 can be a single color or a list of colors. If it is a list of colors a list with the mixed colors will be returned. Example: ; Helper function to print colors as components (defun print-color (c) (if (eq (type-of c) type-list) (print (map (fn (x) (color-split x 1)) c)) (print (color-split c 1)) ) ) (print-color (color-mix (color-make 123 250 99) (color-make 12 25 9) 0.3)) > (89 182 71 0) (print-color (color-mix '(0x224488 0x111111 0x222222) 0x446699 0.5)) > ((51 85 144 0) (42 59 85 0) (51 68 93 0))
+"""
+    },
+    {
+        name = "color-add",
+        comment = """
+(color-add color1 color2) Add color2 to color1. The components are truncated at 255. As with color-mix, the argument color1 can be a single color or a list with colors. Example: ; Helper function to print colors as components (defun print-color (c) (if (eq (type-of c) type-list) (print (map (fn (x) (color-split x 1)) c)) (print (color-split c 1)) ) ) (print-color (color-add (color-make 123 250 99) (color-make 12 25 9))) > (135 255 108 0) (print-color (color-add '(0x224488 0x111111 0x222222) 0x446699)) > ((102 170 255 0) (85 119 170 0) (102 136 187 0))
+"""
+    },
+    {
+        name = "color-sub",
+        comment = """
+(color-sub color1 color2) Subtract color2 from color1. The components are truncated at 0. As with color-mix, the argument color1 can be a single color or a list with colors.
+"""
+    },
+    {
+        name = "color-scale",
+        comment = """
+(color-sub color factor) Scale color with factor. The result is truncated between 0 to 255. As with color-mix, the argument color can be a single color or a list with colors. The argument factor is a scaling factor. Example: ; Helper function to print colors as components (defun print-color (c) (if (eq (type-of c) type-list) (print (map (fn (x) (color-split x 1)) c)) (print (color-split c 1)) ) ) (print-color (color-scale (color-make 123 250 99) 2.0)) > (246 255 198 0) (print-color (color-scale '(0x224488 0x111111 0x222222) 0.6)) > ((20 40 81 0) (10 10 10 0) (20 20 20 0))
+"""
+    },
+    {
+        name = "unzip",
+        comment = """
+(unzip input fileInZip optOutputFile) Unzip input. Input can be a byte array or a file handle on the SD-card. FileInZip is the file in the zip-archive; if it is a string the filename will be used and if it is an integer its sequence number will be used. The optional argument optOutputFile can be used to specify a file to write the output to - if it is not provided the decompressed file is returned as a byte array. Note: When optOutputFile is used the firmware buffer is used to temporally store the output file in order to make the operation as fast as possible. That means if anything is in the firmware buffer it will be destroyed. It also means that the maximum size of the output file is 1.5 MB. Examples: ; Unzip the first file of the archive test.zip (on the SD-card) to the byte array uz (def f (f-open "test.zip" "r")) (def uz (unzip f 0)) (f-close f) ; Unzip the file hello.txt of the archive test.zip (on the SD-card) to the byte array uz (def f (f-open "test.zip" "r")) (def uz (unzip f "hello.txt")) (f-close f) ; Unzip the first file of the imported archive test.zip to the byte array uz (import "test.zip" 'test) (def uz (unzip test 0)) ; Unzip the file hello.txt of the imported archive test.zip to the byte array uz (import "test.zip" 'test) (def uz (unzip test "hello.txt")) ; Unzip the file hello.txt of the archive test.zip (on the SD-card) to the file hello.txt on the SD-card (def f (f-open "test.zip" "r")) (def f-out (f-open "hello.txt" "w")) (unzip f "hello.txt" f-out) (f-close f) (f-close f-out) ; Unzip the file hello.txt of the archive imported test.zip to the file hello.txt on the SD-card (import "test.zip" 'test) (def f-out (f-open "hello.txt" "w")) (unzip test "hello.txt" f-out) (f-close f-out)
+"""
+    },
+    {
+        name = "zip-ls",
+        comment = """
+(zip-ls input) List all files in the archive input. Input can be a byte array or a file handle on the SD-card. Returns a list with the entries; each entry is a list where the first element is the name and the second element is the size when uncompressed. Example: ; List all files in the archive test.zip on the SD-card (def f (f-open "test.zip" "r")) (print (zip-ls f)) (f-close f) > (("test.txt" 7) ("fw.bin" 291871)) ; List all files in the imported archive test.zip (import "test.zip" 'test) (print (zip-ls test)) > (("test.txt" 7) ("fw.bin" 291871))
+"""
+    },
+    {
+        name = "aes-ctr-crypt",
+        comment = """
+(aes-ctr-crypt key counter data start-offset length) Performs in-place AES-CTR (128/192/256) encryption/decryption. Counter will also be updated. Example: (def data [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15]) (def key [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15]) (def counter [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15]) (def start-offset 5) (def len 6) ; Encrypt data (aes-ctr-crypt key counter data start-offset len) (print data) > [0 1 2 3 4 15 146 12 189 72 100 11 12 13 14 15] (print counter) > [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 16] ; Reset counter (setq counter [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15]) ; Decrypt data (aes-ctr-crypt key counter data start-offset len) (print data) > [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15]
+"""
+    },
+    {
+        name = "sleep-deep",
+        comment = """
+(sleep-deep time) Put the CPU in deep sleep mode for time seconds. If time is negative the CPU will sleep forever, or until a wakeup pin triggers a wakeup. Waking up from sleep-deep results in a complete reset.
+"""
+    },
+    {
+        name = "sleep-light",
+        comment = """
+(sleep-light time) Put the CPU in light sleep mode for time seconds. Waking up will return to the point where sleep-light was called without a complete reset, but the power draw is much higher than for sleep-deep. Note that wifi and bluetooth are disabled when using this function, so they have to be enabled again when waking up.
+"""
+    },
+    {
+        name = "sleep-config-wakeup-pin",
+        comment = """
+(sleep-config-wakeup-pin pin state) Configure pin to wake up the CPU from sleep mode. The available pins are 0 to 5 and state can be 0 or 1. 0 means that a low state wakes up the CPU and 1 means that a high state wakes up the CPU.
+"""
+    },
+    {
+        name = "rtc-data",
+        comment = """
+(rtc-data) Returns a 4k byte array from RTC memory that can be used as a general purpose array. What is special about it is that it is retained in deep sleep mode, which is useful for storing state while the CPU is in deep sleep mode.
+"""
+    },
+    {
+        name = "connected-wifi",
+        comment = """
+(connected-wifi) Check if any client (e.g. VESC Tool) is connected over wifi. Returns true when connected, nil otherwise.
+"""
+    },
+    {
+        name = "connected-hub",
+        comment = """
+(connected-hub) Check if we are connected to the TCP hub. Returns true when connected, nil otherwise. Notice that this does not tell if someone is connected to us using the hub, it only tells that we are connected to the hub and that others can connect to us.
+"""
+    },
+    {
+        name = "connected-ble",
+        comment = """
+(connected-ble) Check if any client (e.g. VESC Tool) is connected over ble. Returns true when connected, nil otherwise.
+"""
+    },
+    {
+        name = "connected-usb",
+        comment = """
+(connected-usb) Check if any client (e.g. VESC Tool) is connected over usb. Returns true when connected, nil otherwise.
+"""
+    },
+    {
+        name = "nvs-erase",
+        comment = """
+(nvs-erase) Erase all nvs keys on nvs partition. (nvs-erase "key") Erase a specific key on nvs partition.
+"""
+    },
+    {
+        name = "nvs-qml-erase",
+        comment = """
+(nvs-qml-erase) Erase all nvs keys on qml partition. (nvs-qml-erase "key") Erase a specific key on qml partition.
+"""
+    },
+    {
+        name = "nvs-qml-init",
+        comment = """
+(nvs-qml-init) Initialize the QML-partition with the NVS-module. This has to be done before further NVS-operations can be used. If needed, the QML-partition will be erased; this can happen if other data is stored on the QML-partition that is incompatible with the NVS-module.
+"""
+    },
+    {
+        name = "nvs-read",
+        comment = """
+(nvs-read key) Read key from nvs-partition, return the content as a byte array. Returns nil if a key has not been written to previously.
+"""
+    },
+    {
+        name = "nvs-qml-read",
+        comment = """
+(nvs-qml-read key) Read key from QML-partition, return the content as a byte array. Returns nil if a key has not been written to previously.
+"""
+    },
+    {
+        name = "nvs-write",
+        comment = """
+(nvs-write key data) Write data to key on nvs-partition. If key already exists the old data will be replaced. This can fail if there is not enough space. The space on the nvs partition is shared with eeprom-* commands.
+"""
+    },
+    {
+        name = "nvs-qml-write",
+        comment = """
+(nvs-qml-write key data) Write data to key on QML-partition. If key already exists the old data will be replaced. This can fail if (nvs-qml-init) has not been run or if there is not enough space.
+"""
+    },
+    {
+        name = "nvs-qml-erase-partition",
+        comment = """
+(nvs-qml-erase-partition) Erase all nvs data from qml partition and deinitialize. This allows the QML partition to be used for QML if it was previously used for nvs storage.
+"""
+    },
+    {
+        name = "nvs-list",
+        comment = """
+(nvs-list) Return a list with all existing NVS keys on the nvs partition.
+"""
+    },
+    {
+        name = "nvs-qml-list",
+        comment = """
+(nvs-qml-list) Return a list with all existing NVS keys on the qml partition. If (nvs-qml-init) has not been run this always returns nil .
+"""
+    },
+]
