@@ -70,6 +70,9 @@ Here is the format for the entry file:
 - set
 - string
 - ttf
+- vesc
+- vesc_wifi
+- vesc_ble
 
 A list of each builtin is listed in the builtin folder
 
