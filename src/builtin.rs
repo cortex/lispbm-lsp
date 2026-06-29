@@ -18,6 +18,9 @@ pub static RUNTIME_REF: &str = include_str!("../builtin/runtimeref.toml");
 pub static SET_REF: &str = include_str!("../builtin/setref.toml");
 pub static STRING_REF: &str = include_str!("../builtin/stringref.toml");
 pub static TTF_REF: &str = include_str!("../builtin/ttfref.toml");
+pub static VESC_REF: &str = include_str!("../builtin/vescref.toml");
+pub static VESC_WIFI_REF: &str = include_str!("../builtin/vesc-wifiref.toml");
+pub static VESC_BLE_REF: &str = include_str!("../builtin/vesc-bleref.toml");
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -36,6 +39,9 @@ pub enum Builtin {
     Set,
     String,
     Ttf,
+    Vesc,
+    VescWifi,
+    VescBle,
 }
 
 impl Display for Builtin {
@@ -55,6 +61,9 @@ impl Display for Builtin {
             Builtin::Set => "set.builtin.ext.toml",
             Builtin::String => "string.builtin.ext.toml",
             Builtin::Ttf => "ttf.builtin.ext.toml",
+            Builtin::Vesc => "vesc.builtin.ext.toml",
+            Builtin::VescWifi => "vesc-wifi.builtin.ext.toml",
+            Builtin::VescBle => "vesc-ble.builtin.ext.toml",
         };
         write!(f, "{}", name)
     }
@@ -77,6 +86,9 @@ impl Builtin {
             Builtin::Set => SET_REF,
             Builtin::String => STRING_REF,
             Builtin::Ttf => TTF_REF,
+            Builtin::Vesc => VESC_REF,
+            Builtin::VescWifi => VESC_WIFI_REF,
+            Builtin::VescBle => VESC_BLE_REF,
         }
     }
 
@@ -102,6 +114,9 @@ impl Builtin {
             "set.builtin.ext.toml" => Some(Builtin::Set),
             "string.builtin.ext.toml" => Some(Builtin::String),
             "ttf.builtin.ext.toml" => Some(Builtin::Ttf),
+            "vesc.builtin.ext.toml" => Some(Builtin::Vesc),
+            "vesc-wifi.builtin.ext.toml" => Some(Builtin::VescWifi),
+            "vesc-ble.builtin.ext.toml" => Some(Builtin::VescBle),
             _ => None,
         }
     }
