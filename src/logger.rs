@@ -19,6 +19,9 @@ impl Logger {
 
     pub async fn run(mut self) {
         while let Some((level, message)) = self.rx.recv().await {
+            if level == ls_types::MessageType::ERROR {
+                self.client.show_message(level, &message).await;
+            }
             self.client.log_message(level, message).await;
         }
     }
