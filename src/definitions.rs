@@ -122,7 +122,7 @@ impl Definition {
                     c = String::from("\n\n");
                 };
                 if let Some(existing) = comment {
-                    comment = Some(format!("{} {}", c, existing));
+                    comment = Some(format!("{}  \n{}", c, existing));
                 } else {
                     comment = Some(c);
                 }
