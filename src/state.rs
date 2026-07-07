@@ -81,6 +81,9 @@ pub enum Request {
         file: path::PathBuf,
         content: String,
     },
+    RemoveDefinitions {
+        file: path::PathBuf,
+    },
     GetDiagnostics {
         file: path::PathBuf,
         content: String,
@@ -138,7 +141,10 @@ impl State {
                 return;
             }
         };
-        let mut imports = entry_file.get_all_imports(&mut self.parser).await.unwrap();
+        let mut imports = entry_file
+            .get_all_imports(&mut self.parser)
+            .await
+            .unwrap_or_default();
         imports.push(entry_file.entry_point.clone());
         let ext_imports = match entry_file.get_ext_imports() {
             Ok(i) => i,
@@ -225,8 +231,7 @@ impl State {
                     f.tree.as_ref().unwrap(),
                     file.as_ref(),
                     content.as_bytes(),
-                )
-                .unwrap(),
+                ),
                 "toml" => {
                     let filename = file.as_ref().file_name().and_then(|s| s.to_str());
                     match filename {
@@ -377,6 +382,10 @@ impl State {
                 Request::UpdateDefinitions { file, content } => {
                     info!("[Definition] Updating file {:?}", &file);
                     self.update_definitions(file.into(), content).await;
+                }
+                Request::RemoveDefinitions { file } => {
+                    info!("[Definition] Removing file {:?}", &file);
+                    self.remove_definitions(file.into()).await;
                 }
                 Request::GetDiagnostics {
                     file,
@@ -607,12 +616,13 @@ impl State {
                         &tree,
                         &file.0,
                         content.as_bytes(),
-                    )
-                    .unwrap();
+                    );
                     info!(
-                        "[Indexing] Indexed file {:?} for entry {:?} with {} definitions",
+                        "[Indexing] Indexed file {:?} for entry {} with {} definitions",
                         &file,
-                        id.0.file_name().unwrap().display(),
+                        id.0.file_name()
+                            .and_then(|s| s.to_str())
+                            .unwrap_or("unknown"),
                         defs.len()
                     );
 
@@ -702,6 +712,23 @@ impl State {
                     .insert(file.clone(), def);
             }
         }
+    }
+
+    async fn remove_definitions(&mut self, file: FileId) {
+        if let Some(f) = self.files.get(&file) {
+            info!(
+                "[Definition] Removing definitions for file {:?}, {} definitions removed",
+                &file,
+                f.definitions.len()
+            );
+            for symbol in f.definitions.keys() {
+                if let Some(file_defs) = self.symbol_index.get_mut(symbol) {
+                    file_defs.remove(&file);
+                }
+            }
+        }
+        info!("[Definition] Removing file {:?} from state", &file);
+        self.files.remove(&file);
     }
 }
 

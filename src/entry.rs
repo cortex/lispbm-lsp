@@ -107,7 +107,8 @@ impl EntryFile {
             let node = m.captures[0].node;
             let path = node.utf8_text(content.as_bytes()).unwrap().to_string();
 
-            if let Ok(p) = self.entry_point.parent().unwrap().join(path).canonicalize()
+            if let Some(p) = self.entry_point.parent().map(|p| p.join(path))
+                && let Ok(p) = p.canonicalize()
                 && p.extension()
                     .and_then(|s| s.to_str())
                     .map(|s| s == "lisp" || s == "lispbm")
@@ -174,79 +175,6 @@ impl EntryFile {
                 )
             })
             .collect()
-    }
-
-    pub async fn get_all_ext_definitions(&self) -> HashMap<String, Vec<definitions::Definition>> {
-        let mut defs = HashMap::<String, Vec<definitions::Definition>>::new();
-        for ext in &self.extension {
-            match ext {
-                Extension::Collection(path_buf) => {
-                    let path = self
-                        .entry_point
-                        .parent()
-                        .unwrap()
-                        .join(path_buf)
-                        .canonicalize()
-                        .unwrap();
-                    let content = match tokio::fs::read_to_string(&path).await {
-                        Ok(c) => c,
-                        Err(e) => {
-                            error!(
-                                "Failed to read definition collection file {:?}: {}",
-                                path_buf, e
-                            );
-                            continue;
-                        }
-                    };
-                    let def_file: DefinitionFile = toml::from_str(&content).unwrap();
-                    info!("Loaded definitions from collection: {:?}", path_buf);
-                    for def in def_file.definitions {
-                        let (name, comment) = match def {
-                            Definition::Full { name, comment } => (name, comment),
-                            Definition::Inline(name) => (name, None),
-                        };
-                        let defs = defs.entry(name).or_default();
-                        defs.push(definitions::Definition {
-                            comment,
-                            source: SourceInfo::Collection { path: path.clone() },
-                        });
-                    }
-                }
-                Extension::Builtin(builtin) => {
-                    let def_file = builtin.get_def_file();
-                    for def in def_file.definitions {
-                        let (name, comment) = match def {
-                            Definition::Full { name, comment } => (name, comment),
-                            Definition::Inline(name) => (name, None),
-                        };
-                        let defs = defs.entry(name).or_default();
-                        defs.push(definitions::Definition {
-                            comment,
-                            source: SourceInfo::Builtin {
-                                name: builtin.clone(),
-                            },
-                        });
-                    }
-                }
-                Extension::Inline(definitions) => {
-                    for def in definitions {
-                        let (name, comment) = match def {
-                            Definition::Full { name, comment } => (name, comment),
-                            Definition::Inline(name) => (name, &None),
-                        };
-                        let defs = defs.entry(name.clone()).or_default();
-                        defs.push(definitions::Definition {
-                            comment: comment.clone(),
-                            source: SourceInfo::Collection {
-                                path: self.entry_point.clone(),
-                            },
-                        });
-                    }
-                }
-            }
-        }
-
-        defs
     }
 }
 

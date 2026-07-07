@@ -2,8 +2,6 @@ use std::fmt::Display;
 
 use serde::{Deserialize, Serialize};
 
-use crate::entry;
-
 pub static LBMB_REF: &str = include_str!("../builtin/lbmref.toml");
 pub static ARRY_REF: &str = include_str!("../builtin/arrayref.toml");
 pub static CRYPT_REF: &str = include_str!("../builtin/cryptref.toml");
@@ -90,12 +88,6 @@ impl Builtin {
             Builtin::VescWifi => VESC_WIFI_REF,
             Builtin::VescBle => VESC_BLE_REF,
         }
-    }
-
-    pub fn get_def_file(&self) -> entry::DefinitionFile {
-        let ref_str = self.get_ref();
-        let def_file: entry::DefinitionFile = toml::from_str(ref_str).unwrap();
-        def_file
     }
 
     pub fn from_filename(filename: &str) -> Option<Self> {

@@ -1,7 +1,7 @@
 use std::path;
 
 use tokio::sync;
-use tower_lsp_server::jsonrpc::Result;
+use tower_lsp_server::jsonrpc::{self, Result};
 use tower_lsp_server::ls_types::*;
 use tower_lsp_server::{Client, LanguageServer};
 use tracing::info;
@@ -15,61 +15,45 @@ pub struct Backend {
 
 impl LanguageServer for Backend {
     async fn initialize(&self, p: InitializeParams) -> Result<InitializeResult> {
-        self.client
-            .log_message(
-                MessageType::INFO,
-                "LispBM LSP Server initialized".to_string(),
-            )
-            .await;
-        p.workspace_folders
-            .as_ref()
-            .map(async |folders| {
-                for folder in folders {
-                    let path: path::PathBuf = folder.uri.to_file_path().unwrap().into();
-                    self.client
-                        .log_message(
-                            MessageType::INFO,
-                            format!("Workspace folder: {}", folder.uri.path()),
-                        )
-                        .await;
+        let folders = p.workspace_folders.unwrap_or_default();
+        for folder in folders {
+            let Some(path): Option<path::PathBuf> = folder.uri.to_file_path().map(|p| p.into())
+            else {
+                tracing::error!("Failed to convert URI to file path: {}", folder.uri.path());
+                continue;
+            };
+            info!("Workspace folder: {}", folder.uri.path());
 
-                    self.state
-                        .send(state::Request::SetRoot { path: path.clone() })
-                        .await
-                        .unwrap();
+            self.state
+                .send(state::Request::SetRoot { path: path.clone() })
+                .await
+                .unwrap();
 
-                    let globmatch =
-                        glob::glob(path.join("**/entry.toml").to_str().unwrap()).unwrap();
+            let Ok(globmatch) = glob::glob(path.join("**/entry.toml").to_str().unwrap()) else {
+                tracing::error!(
+                    "Failed to create glob pattern for entry files in: {}",
+                    path.display()
+                );
+                continue;
+            };
 
-                    for entry in globmatch {
-                        match entry {
-                            Ok(entry_path) => {
-                                let req = state::Request::NewEntry {
-                                    id: entry_path.into(),
-                                };
-                                self.state.send(req).await.unwrap();
-                            }
-                            Err(e) => {
-                                self.client
-                                    .log_message(
-                                        MessageType::ERROR,
-                                        format!("Error finding entry files: {}", e),
-                                    )
-                                    .await;
-                            }
-                        }
+            for entry in globmatch {
+                match entry {
+                    Ok(entry_path) => {
+                        let req = state::Request::NewEntry {
+                            id: entry_path.into(),
+                        };
+                        self.state.send(req).await.unwrap();
+                    }
+                    Err(e) => {
+                        tracing::error!("Error finding entry files: {}", e);
+                        continue;
                     }
                 }
-            })
-            .unwrap()
-            .await;
+            }
+        }
 
-        self.client
-            .log_message(
-                MessageType::INFO,
-                "LispBM LSP Server capabilities sent".to_string(),
-            )
-            .await;
+        info!("LispBM LSP Server capabilities sent");
 
         Ok(InitializeResult {
             capabilities: ServerCapabilities {
@@ -80,7 +64,7 @@ impl LanguageServer for Backend {
                         will_save: Some(false),
                         will_save_wait_until: Some(false),
                         save: Some(TextDocumentSyncSaveOptions::SaveOptions(SaveOptions {
-                            include_text: Some(true), // true if you want the file contents in the params
+                            include_text: Some(true),
                         })),
                     },
                 )),
@@ -92,8 +76,37 @@ impl LanguageServer for Backend {
         })
     }
 
+    async fn did_close(&self, params: DidCloseTextDocumentParams) {
+        let Some(path): Option<path::PathBuf> =
+            params.text_document.uri.to_file_path().map(|p| p.into())
+        else {
+            tracing::error!(
+                "Failed to convert URI to file path: {}",
+                params.text_document.uri.path()
+            );
+            return;
+        };
+
+        if path.is_file() && path.exists() {
+            info!("File closed: {}", path.display());
+        } else {
+            self.state
+                .send(state::Request::RemoveDefinitions { file: path })
+                .await
+                .unwrap();
+        }
+    }
+
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
-        let path: path::PathBuf = params.text_document.uri.to_file_path().unwrap().into();
+        let Some(path): Option<path::PathBuf> =
+            params.text_document.uri.to_file_path().map(|p| p.into())
+        else {
+            tracing::error!(
+                "Failed to convert URI to file path: {}",
+                params.text_document.uri.path()
+            );
+            return;
+        };
         let content = params.text_document.text;
 
         let (tx, rx) = tokio::sync::oneshot::channel();
@@ -114,12 +127,7 @@ impl LanguageServer for Backend {
                     .await;
             }
             Err(e) => {
-                self.client
-                    .log_message(
-                        MessageType::ERROR,
-                        format!("Error occurred while fetching diagnostics: {}", e),
-                    )
-                    .await;
+                tracing::error!("Error occurred while fetching diagnostics: {}", e);
             }
         }
 
@@ -136,27 +144,33 @@ impl LanguageServer for Backend {
         &self,
         params: GotoDefinitionParams,
     ) -> Result<Option<GotoDefinitionResponse>> {
-        self.client
-            .log_message(
-                MessageType::INFO,
-                format!(
-                    "Received goto type definition request for: {} at line {}, column {}",
-                    params
-                        .text_document_position_params
-                        .text_document
-                        .uri
-                        .path(),
-                    params.text_document_position_params.position.line,
-                    params.text_document_position_params.position.character
-                ),
-            )
-            .await;
-        let path = params
+        info!(
+            "Received goto type definition request for: {} at line {}, column {}",
+            params
+                .text_document_position_params
+                .text_document
+                .uri
+                .path(),
+            params.text_document_position_params.position.line,
+            params.text_document_position_params.position.character
+        );
+        let path: path::PathBuf = params
             .text_document_position_params
             .text_document
             .uri
             .to_file_path()
-            .unwrap();
+            .map(|p| p.into())
+            .ok_or(jsonrpc::Error::invalid_request())
+            .inspect_err(|_| {
+                tracing::error!(
+                    "File not found for goto definition: {}",
+                    params
+                        .text_document_position_params
+                        .text_document
+                        .uri
+                        .path()
+                )
+            })?;
 
         let line = params.text_document_position_params.position.line;
         let column = params.text_document_position_params.position.character;
@@ -164,7 +178,7 @@ impl LanguageServer for Backend {
         let (tx, rx) = tokio::sync::oneshot::channel();
         self.state
             .send(state::Request::GetDefinition {
-                file: path.into(),
+                file: path,
                 line,
                 column,
                 response: tx,
@@ -178,11 +192,23 @@ impl LanguageServer for Backend {
     }
 
     async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
-        let path = params
+        let path: path::PathBuf = params
             .text_document_position_params
             .text_document
             .uri
-            .path();
+            .to_file_path()
+            .map(|p| p.into())
+            .ok_or(jsonrpc::Error::invalid_request())
+            .inspect_err(|_| {
+                tracing::error!(
+                    "File not found for hover: {}",
+                    params
+                        .text_document_position_params
+                        .text_document
+                        .uri
+                        .path()
+                )
+            })?;
 
         let line = params.text_document_position_params.position.line;
         let column = params.text_document_position_params.position.character;
@@ -192,7 +218,9 @@ impl LanguageServer for Backend {
                 MessageType::INFO,
                 format!(
                     "Received hover request for: {} at line {}, column {}",
-                    path, line, column
+                    path.display(),
+                    line,
+                    column
                 ),
             )
             .await;
@@ -200,7 +228,7 @@ impl LanguageServer for Backend {
         let (tx, rx) = tokio::sync::oneshot::channel();
         self.state
             .send(state::Request::GetHover {
-                file: path.as_str().into(),
+                file: path,
                 line,
                 column,
                 response: tx,
@@ -215,7 +243,15 @@ impl LanguageServer for Backend {
 
     async fn did_save(&self, params: DidSaveTextDocumentParams) {
         info!("File saved");
-        let path: path::PathBuf = params.text_document.uri.to_file_path().unwrap().into();
+        let Some(path): Option<path::PathBuf> =
+            params.text_document.uri.to_file_path().map(|f| f.into())
+        else {
+            tracing::error!(
+                "File not found for save: {}",
+                params.text_document.uri.path()
+            );
+            return;
+        };
         let content = params.text.unwrap_or_default();
 
         self.state
@@ -230,7 +266,12 @@ impl LanguageServer for Backend {
     async fn did_change(&self, mut params: DidChangeTextDocumentParams) {
         // For simplicity, we assume TextDocumentSyncKind::FULL
         if let Some(event) = params.content_changes.pop() {
-            let path: path::PathBuf = params.text_document.uri.to_file_path().unwrap().into();
+            let Some(path): Option<path::PathBuf> =
+                params.text_document.uri.to_file_path().map(|f| f.into())
+            else {
+                tracing::error!("File not found: {}", params.text_document.uri.path());
+                return;
+            };
 
             let (tx, rx) = tokio::sync::oneshot::channel();
             self.state
@@ -250,12 +291,7 @@ impl LanguageServer for Backend {
                         .await;
                 }
                 Err(e) => {
-                    self.client
-                        .log_message(
-                            MessageType::ERROR,
-                            format!("Error occurred while fetching diagnostics: {}", e),
-                        )
-                        .await;
+                    tracing::error!("Error occurred while fetching diagnostics: {}", e);
                 }
             }
         }

@@ -42,7 +42,7 @@ impl Definition {
         tree: &tree_sitter::Tree,
         path: &path::Path,
         content: &[u8],
-    ) -> Result<HashMap<String, Vec<Self>>, String> {
+    ) -> HashMap<String, Vec<Self>> {
         let q = tree_sitter::Query::new(
             &tree_sitter_lispbm::LANGUAGE.into(),
             r#"
@@ -63,11 +63,17 @@ impl Definition {
         let root = tree.root_node();
         let mut defs = HashMap::<String, Vec<Self>>::new();
         cursor.matches(&q, root, content).for_each(|m| {
-            let (name, def) = Self::from_def_match(m.captures, content, path.into()).unwrap();
+            let (name, def) = match Self::from_def_match(m.captures, content, path.into()) {
+                Ok(s) => s,
+                Err(e) => {
+                    tracing::error!("Error parsing definition: {}", e);
+                    return;
+                }
+            };
             defs.entry(name).or_default().push(def);
         });
 
-        Ok(defs)
+        defs
     }
 
     pub fn from_def_match(
