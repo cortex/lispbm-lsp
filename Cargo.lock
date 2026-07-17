@@ -924,7 +924,7 @@ checksum = "009994f150cc0cd50ff54917d5bc8bffe8cad10ca10d81c34da2ec421ae61782"
 [[package]]
 name = "tree-sitter-lispbm"
 version = "0.1.0"
-source = "git+https://github.com/cortex/tree-sitter-lispbm.git#0186edda34489931bd4b973fbcdf789ed2d303ba"
+source = "git+https://github.com/cortex/tree-sitter-lispbm.git#13f9f9efcd963c51cdb36556abb0ffbb77b6dd4b"
 dependencies = [
  "cc",
  "tree-sitter-language",
