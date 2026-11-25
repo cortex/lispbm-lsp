@@ -1,9 +1,27 @@
-use std::{collections::HashMap, path};
+use std::{collections::HashMap, path, sync::LazyLock};
 
 use serde::{Deserialize, Serialize};
-use tree_sitter::{QueryCursor, StreamingIterator};
+use tree_sitter::{Query, QueryCursor, StreamingIterator};
 
-use crate::builtin;
+use crate::{builtin, file::FileId};
+
+static DEFINITION_QUERY: LazyLock<Query> = LazyLock::new(|| {
+    Query::new(
+        &tree_sitter_lispbm::LANGUAGE.into(),
+        r#"
+            (_
+                (comment)* @doc_comment
+                .
+                [
+                  (definition name: (symbol) @name ) @node
+                  (function_definition name: (symbol) @name ) @node
+                ]
+                .
+                (comment)* @doc_comment)
+        "#,
+    )
+    .expect("valid definition query")
+});
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Definition {
@@ -27,12 +45,11 @@ pub enum SourceInfo {
     },
 }
 
-impl SourceInfo {
-    pub fn id(&self) -> String {
-        match self {
-            SourceInfo::Source { file, .. } => file.display().to_string(),
-            SourceInfo::Builtin { name } => name.to_string(),
-            SourceInfo::Collection { path } => path.display().to_string(),
+impl From<&FileId> for SourceInfo {
+    fn from(id: &FileId) -> Self {
+        match id {
+            FileId::Path(path) => SourceInfo::Collection { path: path.clone() },
+            FileId::Builtin(name) => SourceInfo::Builtin { name: *name },
         }
     }
 }
@@ -43,35 +60,21 @@ impl Definition {
         path: &path::Path,
         content: &[u8],
     ) -> HashMap<String, Vec<Self>> {
-        let q = tree_sitter::Query::new(
-            &tree_sitter_lispbm::LANGUAGE.into(),
-            r#"
-            (_
-                (comment)* @doc_comment
-                .
-                [
-                  (definition name: (symbol) @name ) @node
-                  (function_definition name: (symbol) @name ) @node
-                ]
-                .
-                (comment)* @doc_comment)
-            "#,
-        )
-        .unwrap();
-
         let mut cursor = QueryCursor::new();
         let root = tree.root_node();
         let mut defs = HashMap::<String, Vec<Self>>::new();
-        cursor.matches(&q, root, content).for_each(|m| {
-            let (name, def) = match Self::from_def_match(m.captures, content, path.into()) {
-                Ok(s) => s,
-                Err(e) => {
-                    tracing::error!("Error parsing definition: {}", e);
-                    return;
-                }
-            };
-            defs.entry(name).or_default().push(def);
-        });
+        cursor
+            .matches(&DEFINITION_QUERY, root, content)
+            .for_each(|m| {
+                let (name, def) = match Self::from_def_match(m.captures, content, path.into()) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        tracing::error!("Error parsing definition: {}", e);
+                        return;
+                    }
+                };
+                defs.entry(name).or_default().push(def);
+            });
 
         defs
     }

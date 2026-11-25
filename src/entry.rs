@@ -1,21 +1,16 @@
 use std::{collections::HashMap, path};
 
 use serde::{Deserialize, Serialize};
-use tracing::{error, info};
-use tree_sitter::{QueryCursor, StreamingIterator};
 
-use crate::{
-    builtin,
-    definitions::{self, SourceInfo},
-};
+use crate::{builtin, definitions, file::FileId};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EntryFile {
     pub entry_point: path::PathBuf,
     pub extension: Vec<Extension>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Extension {
     #[serde(rename = "path")]
@@ -25,7 +20,7 @@ pub enum Extension {
     Inline(Vec<Definition>),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[serde(untagged)]
 pub enum Definition {
@@ -36,148 +31,67 @@ pub enum Definition {
     Inline(String),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct DefinitionFile {
     pub definitions: Vec<Definition>,
 }
 
 impl DefinitionFile {
-    pub fn get_definitions(
-        &self,
-        path: &path::Path,
-    ) -> HashMap<String, Vec<definitions::Definition>> {
-        self.definitions
-            .iter()
-            .map(|def| {
-                let (name, comment) = match def {
-                    Definition::Full { name, comment } => (name.clone(), comment.clone()),
-                    Definition::Inline(name) => (name.clone(), None),
-                };
-                (
-                    name,
-                    vec![definitions::Definition {
-                        comment,
-                        source: SourceInfo::Collection {
-                            path: path.to_path_buf(),
-                        },
-                    }],
-                )
-            })
-            .collect()
+    pub fn definitions(&self, id: &FileId) -> HashMap<String, Vec<definitions::Definition>> {
+        collect_definitions(&self.definitions, id)
     }
 }
 
 impl EntryFile {
-    pub async fn load_from_file(path: &path::Path) -> Result<Self, std::io::Error> {
-        let content = tokio::fs::read_to_string(path).await?;
-        let mut entry_file: EntryFile = toml::from_str(&content).map_err(|e| {
-            error!("Failed to parse entry file: {}", e);
-            std::io::ErrorKind::InvalidInput
-        })?;
-        entry_file.entry_point = path
-            .parent()
-            .unwrap()
-            .join(entry_file.entry_point)
-            .canonicalize()?;
-
-        info!(
-            "[Entry] Loaded: {:?}, Extensions: {:?}",
-            path, entry_file.extension
-        );
-
-        Ok(entry_file)
+    /// `dir` is the directory containing the entry file, which all its paths are relative to.
+    pub fn entry_point(&self, dir: &path::Path) -> FileId {
+        FileId::from_path(&dir.join(&self.entry_point))
     }
 
-    pub async fn get_all_imports(
-        &self,
-        parser: &mut tree_sitter::Parser,
-    ) -> Option<Vec<path::PathBuf>> {
-        let content = tokio::fs::read_to_string(&self.entry_point).await.ok()?;
-        let tree = parser.parse(&content, None)?;
-        let q = tree_sitter::Query::new(
-            &tree_sitter_lispbm::LANGUAGE.into(),
-            r#"(special_form keyword: "import" (string "\"" (_)* @str "\"" ))"#,
-        )
-        .unwrap();
-        let mut cursor = QueryCursor::new();
-        let mut paths = vec![];
-        let root = tree.root_node();
-        cursor.matches(&q, root, content.as_bytes()).for_each(|m| {
-            let node = m.captures[0].node;
-            let path = node.utf8_text(content.as_bytes()).unwrap().to_string();
-
-            if let Some(p) = self.entry_point.parent().map(|p| p.join(path))
-                && let Ok(p) = p.canonicalize()
-                && p.extension()
-                    .and_then(|s| s.to_str())
-                    .map(|s| s == "lisp" || s == "lispbm")
-                    .unwrap_or(false)
-            {
-                paths.push(p);
-            }
-        });
-
-        Some(paths)
-    }
-
-    pub fn get_ext_imports(&self) -> Result<Vec<path::PathBuf>, std::io::Error> {
-        let mut paths = vec![];
-        for ext in &self.extension {
-            match ext {
-                Extension::Collection(path_buf) => {
-                    let path = self
-                        .entry_point
-                        .parent()
-                        .ok_or(std::io::ErrorKind::IsADirectory)?
-                        .join(path_buf)
-                        .canonicalize()?;
-                    info!("[Entry] Loaded extension collection: {:?}", path);
-                    paths.push(path);
-                }
-                Extension::Inline(_) => {
-                    let path = self.entry_point.clone();
-                    paths.push(path);
-                }
-                Extension::Builtin(builtin) => {
-                    let id = builtin.to_string();
-                    info!("[Entry] Loaded extension builtin: {:?}", id);
-                    paths.push(path::PathBuf::from(id));
-                }
-            }
-        }
-
-        Ok(paths)
-    }
-
-    pub fn get_ext_inline_definitions(&self) -> HashMap<String, Vec<definitions::Definition>> {
+    /// Files providing extensions. See [`EntryFile::entry_point`] for `dir`.
+    pub fn extension_files(&self, dir: &path::Path) -> Vec<FileId> {
         self.extension
             .iter()
             .filter_map(|ext| match ext {
-                Extension::Inline(definitions) => Some(definitions),
-                _ => None,
-            })
-            .flatten()
-            .map(|def| {
-                let (name, comment) = match def {
-                    Definition::Full { name, comment } => (name.clone(), comment.clone()),
-                    Definition::Inline(name) => (name.clone(), None),
-                };
-                info!("[Enrty] Loaded inline definition: {}", name);
-                (
-                    name,
-                    vec![definitions::Definition {
-                        comment,
-                        source: SourceInfo::Collection {
-                            path: self.entry_point.clone(),
-                        },
-                    }],
-                )
+                Extension::Collection(path) => Some(FileId::from_path(&dir.join(path))),
+                Extension::Builtin(builtin) => Some(FileId::Builtin(*builtin)),
+                Extension::Inline(_) => None,
             })
             .collect()
     }
+
+    pub fn inline_definitions(&self, id: &FileId) -> HashMap<String, Vec<definitions::Definition>> {
+        let inline = self.extension.iter().filter_map(|ext| match ext {
+            Extension::Inline(definitions) => Some(definitions),
+            _ => None,
+        });
+        collect_definitions(inline.flatten(), id)
+    }
 }
 
+fn collect_definitions<'a>(
+    definitions: impl IntoIterator<Item = &'a Definition>,
+    id: &FileId,
+) -> HashMap<String, Vec<definitions::Definition>> {
+    let mut collected = HashMap::<_, Vec<_>>::new();
+    for def in definitions {
+        let (name, comment) = match def {
+            Definition::Full { name, comment } => (name, comment.clone()),
+            Definition::Inline(name) => (name, None),
+        };
+        collected
+            .entry(name.clone())
+            .or_default()
+            .push(definitions::Definition {
+                comment,
+                source: id.into(),
+            });
+    }
+    collected
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -230,5 +144,34 @@ mod tests {
 
         assert_eq!(toml.entry_point, entry.entry_point);
         assert_eq!(toml.extension.len(), entry.extension.len());
+    }
+
+    #[test]
+    fn paths_are_relative_to_the_entry_file() {
+        let entry: EntryFile = toml::from_str(
+            "entry_point = \"src/main.lisp\"\nextension = [{ path = \"ext.toml\" }, { builtin = \"lbm\" }]",
+        )
+        .unwrap();
+        let dir = path::Path::new("/does-not-exist/project");
+
+        assert_eq!(
+            entry.entry_point(dir),
+            FileId::Path(dir.join("src/main.lisp"))
+        );
+        assert_eq!(
+            entry.extension_files(dir),
+            [
+                FileId::Path(dir.join("ext.toml")),
+                FileId::Builtin(builtin::Builtin::Lbm)
+            ]
+        );
+    }
+
+    #[test]
+    fn repeated_names_are_all_kept() {
+        let file: DefinitionFile = toml::from_str("definitions = [\"a\", \"b\", \"a\"]").unwrap();
+        let defs = file.definitions(&FileId::Builtin(builtin::Builtin::Lbm));
+        assert_eq!(defs["a"].len(), 2);
+        assert_eq!(defs["b"].len(), 1);
     }
 }
