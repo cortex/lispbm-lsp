@@ -1,6 +1,7 @@
 mod builtin;
 mod definitions;
 mod entry;
+mod file;
 mod logger;
 mod lsp;
 mod state;
@@ -12,12 +13,6 @@ use tracing_subscriber::layer::SubscriberExt;
 async fn main() {
     let stdin = tokio::io::stdin();
     let stdout = tokio::io::stdout();
-
-    let mut parser = tree_sitter::Parser::new();
-    let language = tree_sitter_lispbm::LANGUAGE;
-    parser
-        .set_language(&language.into())
-        .expect("Error loading lispBM grammar");
 
     let (service, socket) = LspService::new(|client| {
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();

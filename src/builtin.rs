@@ -20,7 +20,7 @@ pub static VESC_REF: &str = include_str!("../builtin/vescref.toml");
 pub static VESC_WIFI_REF: &str = include_str!("../builtin/vesc-wifiref.toml");
 pub static VESC_BLE_REF: &str = include_str!("../builtin/vesc-bleref.toml");
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Builtin {
     Lbm,
@@ -87,29 +87,6 @@ impl Builtin {
             Builtin::Vesc => VESC_REF,
             Builtin::VescWifi => VESC_WIFI_REF,
             Builtin::VescBle => VESC_BLE_REF,
-        }
-    }
-
-    pub fn from_filename(filename: &str) -> Option<Self> {
-        match filename {
-            "lbm.builtin.ext.toml" => Some(Builtin::Lbm),
-            "array.builtin.ext.toml" => Some(Builtin::Array),
-            "crypt.builtin.ext.toml" => Some(Builtin::Crypt),
-            "display.builtin.ext.toml" => Some(Builtin::Display),
-            "dsp.builtin.ext.toml" => Some(Builtin::Dsp),
-            "dyn.builtin.ext.toml" => Some(Builtin::Dyn),
-            "lbm-image-format.builtin.ext.toml" => Some(Builtin::LbmImageFormat),
-            "math.builtin.ext.toml" => Some(Builtin::Math),
-            "mutex.builtin.ext.toml" => Some(Builtin::Mutex),
-            "random.builtin.ext.toml" => Some(Builtin::Random),
-            "runtime.builtin.ext.toml" => Some(Builtin::Runtime),
-            "set.builtin.ext.toml" => Some(Builtin::Set),
-            "string.builtin.ext.toml" => Some(Builtin::String),
-            "ttf.builtin.ext.toml" => Some(Builtin::Ttf),
-            "vesc.builtin.ext.toml" => Some(Builtin::Vesc),
-            "vesc-wifi.builtin.ext.toml" => Some(Builtin::VescWifi),
-            "vesc-ble.builtin.ext.toml" => Some(Builtin::VescBle),
-            _ => None,
         }
     }
 }
